@@ -47,6 +47,14 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    activationTokenHash: {
+      type: String,
+      select: false,
+    },
+    activationTokenExpiry: {
+      type: Date,
+      select: false,
+    },
   },
   { timestamps: true }
 );

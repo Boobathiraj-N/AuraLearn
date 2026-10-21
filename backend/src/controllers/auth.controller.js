@@ -221,4 +221,125 @@ const verifyStudentOtp = async (req, res, next) => {
   }
 };
 
-module.exports = { registerStudent, verifyStudentOtp };
+const loginUser = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required",
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const user = await User.findOne({
+      email: normalizedEmail,
+    }).select("+password");
+
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is not active",
+      });
+    }
+
+    const token = require("jsonwebtoken").sign(
+      {
+        id: user._id,
+        role: user.role,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const activateStaff = async (req, res, next) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Activation token and password are required",
+      });
+    }
+
+    if (typeof token !== "string" || typeof password !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Token and password must be strings",
+      });
+    }
+
+    if (password.length < 8 || password.length > 72) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must contain 8 to 72 characters",
+      });
+    }
+
+    // Hash the token received from the activation link
+    const activationTokenHash = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
+
+    // Find a matching, unexpired activation token
+    const user = await User.findOne({
+      activationTokenHash,
+      activationTokenExpiry: { $gt: new Date() },
+      role: { $in: ["support", "sales"] },
+      isActive: false,
+    }).select("+activationTokenHash +activationTokenExpiry");
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired activation link",
+      });
+    }
+
+    // Hash the new password
+    user.password = await bcrypt.hash(password, 12);
+
+    // Activate account and invalidate the token
+    user.isActive = true;
+    user.activationTokenHash = undefined;
+    user.activationTokenExpiry = undefined;
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Staff account activated successfully. You can now log in.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { registerStudent, verifyStudentOtp, loginUser,activateStaff,};
