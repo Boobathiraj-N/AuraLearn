@@ -33,9 +33,9 @@ const protect = async (req, res, next) => {
 
     next();
   } catch (error) {
-    return res.status(401).json({
+    return res.status(403).json({
       success: false,
-      message: "Invalid or expired token",
+      message:  "User not found or account is inactive",
     });
   }
 };
