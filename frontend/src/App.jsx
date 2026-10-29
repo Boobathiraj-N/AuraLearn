@@ -8,6 +8,8 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import "./App.css";
 import StaffManagement from "./pages/admin/StaffManagement";
 import SetStaffPassword from "./pages/portal/SetStaffPassword";
+import CourseManagement from "./pages/admin/CourseManagement";
+
 
 function App() {
   return (
@@ -25,10 +27,7 @@ function App() {
         <Route path="/admin" element={<DashboardLayout />}>
           <Route index element={<AdminDashboard />} />
           <Route path="staff" element={<StaffManagement />} />
-          <Route
-            path="courses"
-            element={<h1>Course Management — Coming later</h1>}
-          />
+          <Route path="courses" element={<CourseManagement />} />
           <Route
             path="settings"
             element={<h1>Settings — Coming later</h1>}
