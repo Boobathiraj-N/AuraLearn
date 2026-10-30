@@ -9,7 +9,12 @@ import {
 } from "lucide-react";
 import { getAdminCourses } from "../../services/courseService";
 import { getModulesByCourse } from "../../services/moduleService";
-import { getLessonsByModule, createLesson, } from "../../services/lessonService";
+import {
+  getLessonsByModule,
+  createLesson,
+  updateLesson,
+  deleteLesson,
+} from "../../services/lessonService";
 
 function LessonManagement() {
   const [selectedCourse, setSelectedCourse] = useState("");
@@ -33,6 +38,8 @@ function LessonManagement() {
     isFreePreview: false,
     status: "draft",
     });
+    const [editingLessonId, setEditingLessonId] = useState(null);
+    const [modalMode, setModalMode] = useState("create");
 
     useEffect(() => {
     const fetchCourses = async () => {
@@ -128,41 +135,90 @@ function LessonManagement() {
     }));
     };
 
-    const handleCreateLesson = async (e) => {
-    e.preventDefault();
+const handleCreateLesson = async (e) => {
+  e.preventDefault();
 
-    try {
-        setSavingLesson(true);
-        setError("");
+  try {
+    setSavingLesson(true);
+    setError("");
 
-        await createLesson({
-        ...lessonForm,
-        module: selectedModule,
-        order: Number(lessonForm.order),
-        durationMinutes: Number(lessonForm.durationMinutes),
-        });
+    const lessonData = {
+      ...lessonForm,
+      module: selectedModule,
+      order: Number(lessonForm.order),
+      durationMinutes: Number(lessonForm.durationMinutes),
+    };
 
-        const response = await getLessonsByModule(selectedModule);
-        setLessons(response.lessons || []);
+    if (modalMode === "edit") {
+      await updateLesson(editingLessonId, lessonData);
+    } else {
+      await createLesson(lessonData);
+    }
+
+    // Refresh lessons after create or update
+    const response = await getLessonsByModule(selectedModule);
+    setLessons(response.lessons || []);
+
+    // Reset form
+    setLessonForm({
+      title: "",
+      description: "",
+      videoUrl: "",
+      durationMinutes: 0,
+      order: "",
+      isFreePreview: false,
+      status: "draft",
+    });
+
+    setEditingLessonId(null);
+    setModalMode("create");
+    setShowLessonModal(false);
+
+  } catch (error) {
+    setError(
+      error.response?.data?.message || "Failed to save lesson"
+    );
+  } finally {
+    setSavingLesson(false);
+  }
+};
+
+    const handleEditLesson = (lesson) => {
+        setEditingLessonId(lesson._id);
+        setModalMode("edit");
 
         setLessonForm({
-        title: "",
-        description: "",
-        videoUrl: "",
-        durationMinutes: 0,
-        order: "",
-        isFreePreview: false,
-        status: "draft",
+            title: lesson.title || "",
+            description: lesson.description || "",
+            videoUrl: lesson.videoUrl || "",
+            durationMinutes: lesson.durationMinutes || 0,
+            order: lesson.order || "",
+            isFreePreview: lesson.isFreePreview || false,
+            status: lesson.status || "draft",
         });
 
-        setShowLessonModal(false);
-    } catch (error) {
-        setError(
-        error.response?.data?.message || "Failed to create lesson"
+        setShowLessonModal(true);
+    };
+
+    const handleDeleteLesson = async (lessonId) => {
+        const confirmDelete = window.confirm(
+            "Are you sure you want to delete this lesson?"
         );
-    } finally {
-        setSavingLesson(false);
-    }
+
+        if (!confirmDelete) return;
+
+        try {
+            setError("");
+
+            await deleteLesson(lessonId);
+
+            const response = await getLessonsByModule(selectedModule);
+            setLessons(response.lessons || []);
+        } catch (error) {
+            setError(
+            error.response?.data?.message || "Failed to delete lesson"
+            );
+        }
     };
 
   return (
@@ -328,6 +384,7 @@ function LessonManagement() {
                     <th className="px-4 py-3">Duration</th>
                     <th className="px-4 py-3">Preview</th>
                     <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Actions</th>
                 </tr>
                 </thead>
 
@@ -347,6 +404,22 @@ function LessonManagement() {
                     <td className="px-4 py-3">
                         {lesson.status}
                     </td>
+                    <td className="px-4 py-3">
+                        {/* Edit Button  */}
+                        <button
+                            onClick={() => handleEditLesson(lesson)}
+                            className="rounded-lg bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-600 transition hover:bg-indigo-100"
+                        >
+                            Edit
+                        </button>
+                        {/* Delete Button  */}
+                        <button
+                            onClick={() => handleDeleteLesson(lesson._id)}
+                            className="rounded-lg bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-100"
+                            >
+                            Delete
+                            </button>
+                        </td>
                     </tr>
                 ))}
                 </tbody>
@@ -361,7 +434,7 @@ function LessonManagement() {
                 <div className="flex items-center justify-between border-b p-5">
                     <div>
                     <h2 className="text-lg font-semibold text-slate-800">
-                        Create New Lesson
+                    {modalMode === "edit" ? "Edit Lesson" : "Create New Lesson"}
                     </h2>
                     <p className="text-sm text-slate-500">
                         Add a lesson to the selected module.
@@ -492,7 +565,11 @@ function LessonManagement() {
                         disabled={savingLesson}
                         className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                     >
-                        {savingLesson ? "Creating..." : "Create Lesson"}
+                        {savingLesson
+                            ? "Saving..."
+                            : modalMode === "edit"
+                                ? "Update Lesson"
+                                : "Create Lesson"}
                     </button>
                     </div>
                 </form>
