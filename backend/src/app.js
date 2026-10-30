@@ -23,6 +23,8 @@ app.use("/api/progress", progressRoutes);
 app.use("/api/submissions", submissionRoutes);
 app.use("/api/upload", uploadRoutes);
 
+
+
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     success: true,

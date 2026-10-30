@@ -14,6 +14,7 @@ const menuItems = [
   { label: "Staff Management", path: "/admin/staff", icon: Users },
   { label: "Courses", path: "/admin/courses", icon: BookOpen },
   { label: "Settings", path: "/admin/settings", icon: Settings },
+  { label: "Lessons", path: "/admin/lessons", icon: BookOpen },
 ];
 
 function Sidebar({ open, onClose }) {

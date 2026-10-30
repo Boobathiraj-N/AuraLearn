@@ -9,7 +9,7 @@ import "./App.css";
 import StaffManagement from "./pages/admin/StaffManagement";
 import SetStaffPassword from "./pages/portal/SetStaffPassword";
 import CourseManagement from "./pages/admin/CourseManagement";
-
+import LessonManagement from "./pages/admin/LessonManagement";
 
 function App() {
   return (
@@ -28,6 +28,7 @@ function App() {
           <Route index element={<AdminDashboard />} />
           <Route path="staff" element={<StaffManagement />} />
           <Route path="courses" element={<CourseManagement />} />
+          <Route path="lessons" element={<LessonManagement />} />
           <Route
             path="settings"
             element={<h1>Settings — Coming later</h1>}
