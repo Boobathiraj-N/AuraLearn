@@ -38,4 +38,3 @@ export const deleteModule = async (moduleId) => {
 
   return response.data;
 };
-

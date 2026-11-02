@@ -1,5 +1,7 @@
 
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
+import { logoutUser, getAuthUser } from "../../services/authService";
+
 import {
   LayoutDashboard,
   Users,
@@ -7,17 +9,48 @@ import {
   Settings,
   GraduationCap,
   X,
+  LogOut,
+  ClipboardList,
 } from "lucide-react";
 
-const menuItems = [
+const adminMenuItems = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
   { label: "Staff Management", path: "/admin/staff", icon: Users },
   { label: "Courses", path: "/admin/courses", icon: BookOpen },
-  { label: "Settings", path: "/admin/settings", icon: Settings },
   { label: "Lessons", path: "/admin/lessons", icon: BookOpen },
+  { label: "Settings", path: "/admin/settings", icon: Settings },
+];
+
+const staffMenuItems = (role) => [
+  {
+    label: "Dashboard",
+    path: `/${role}`,
+    icon: LayoutDashboard,
+  },
+  {
+    label: "Leads",
+    path: `/${role}/leads`,
+    icon: ClipboardList,
+  },
 ];
 
 function Sidebar({ open, onClose }) {
+  const navigate = useNavigate();
+  const user = getAuthUser();
+  const role = user?.role;
+
+  const menuItems =
+    role === "admin"
+      ? adminMenuItems
+      : role === "support" || role === "sales"
+        ? staffMenuItems(role)
+        : [];
+
+  const handleLogout = () => {
+    logoutUser();
+    navigate("/login", { replace: true });
+  };
+
   return (
     <>
       {open && (
@@ -55,7 +88,7 @@ function Sidebar({ open, onClose }) {
             <NavLink
               key={path}
               to={path}
-              end={path === "/admin"}
+              end={path === `/${role}`}
               className={({ isActive }) =>
                 `sidebar-link ${isActive ? "active" : ""}`
               }
@@ -69,10 +102,21 @@ function Sidebar({ open, onClose }) {
 
         <div className="sidebar-footer">
           <div className="sidebar-avatar">AI</div>
-          <div>
+
+          <div className="sidebar-user-info">
             <strong>AuraLearn AI</strong>
-            <p>Admin workspace</p>
+            <p>{role ? role.charAt(0).toUpperCase() + role.slice(1) : "Workspace"}</p>
           </div>
+
+          <button
+            type="button"
+            className="sidebar-logout"
+            onClick={handleLogout}
+            title="Sign out"
+            aria-label="Sign out"
+          >
+            <LogOut size={19} />
+          </button>
         </div>
       </aside>
     </>

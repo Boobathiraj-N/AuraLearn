@@ -38,9 +38,11 @@ function Login() {
 
     try {
       const result = await loginUser({
+        
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
       });
+      console.log("LOGIN RESULT:", result);
 
       if (!result.token || !result.user) {
         setError("Login response is incomplete. Please try again.");
@@ -52,7 +54,22 @@ function Login() {
       localStorage.setItem("authUser", JSON.stringify(result.user));
 
       // Dashboard routing will be added with RBAC later.
-      navigate("/login-success", { replace: true });
+      const roleRoutes = {
+        admin: "/admin",
+        student: "/student",
+        support: "/support",
+        sales: "/sales",
+      };
+
+      const dashboardPath = roleRoutes[result.user.role];
+
+      if (!dashboardPath) {
+        setError("Invalid user role. Please contact administrator.");
+        return;
+      }
+
+      navigate(dashboardPath, { replace: true });
+
     } catch (err) {
       setError(
         err.response?.data?.message ||

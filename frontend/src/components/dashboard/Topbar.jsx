@@ -1,7 +1,15 @@
 
 import { Bell, Menu, Search } from "lucide-react";
+import { getAuthUser } from "../../services/authService";
 
 function Topbar({ onMenuClick }) {
+  const user = getAuthUser();
+
+  const userName = user?.name || "User";
+  const userRole = user?.role || "Unknown";
+
+  const avatar = userName.charAt(0).toUpperCase();
+
   return (
     <header className="dashboard-topbar">
       <button
@@ -22,16 +30,22 @@ function Topbar({ onMenuClick }) {
       </div>
 
       <div className="topbar-actions">
-        <button className="notification-button" aria-label="Notifications">
+        <button
+          className="notification-button"
+          aria-label="Notifications"
+        >
           <Bell size={20} />
           <span />
         </button>
 
         <div className="topbar-profile">
-          <div className="profile-avatar">A</div>
+          <div className="profile-avatar">{avatar}</div>
+
           <div className="profile-details">
-            <strong>Administrator</strong>
-            <span>Admin</span>
+            <strong>{userName}</strong>
+            <span>
+              {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
+            </span>
           </div>
         </div>
       </div>

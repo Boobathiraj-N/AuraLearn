@@ -4,6 +4,12 @@ const Progress = require("../models/Progress");
 const Course = require("../models/Course");
 const Lesson = require("../models/Lesson");
 
+const Module = require("../models/Module");
+const Enrollment = require("../models/Enrollment");
+const Lead = require("../models/Lead");
+
+const { assignLead } = require("../services/leadAssignment.service");
+
 // GET STUDENT'S COURSE PROGRESS
 const getCourseProgress = async (req, res, next) => {
   try {
@@ -52,7 +58,10 @@ const getCourseProgress = async (req, res, next) => {
 };
 
 // MARK LESSON AS COMPLETED
+
 const completeLesson = async (req, res, next) => {
+  const session = await mongoose.startSession();
+
   try {
     const { courseId, lessonId } = req.params;
     const studentId = req.user.id;
@@ -67,92 +76,143 @@ const completeLesson = async (req, res, next) => {
       });
     }
 
-    const course = await Course.findById(courseId);
+    let result;
 
-    if (!course) {
-      return res.status(404).json({
-        success: false,
-        message: "Course not found",
-      });
-    }
+    await session.withTransaction(async () => {
+      const course = await Course.findById(courseId).session(session);
 
-    const lesson = await Lesson.findById(lessonId);
+      if (!course) {
+        const error = new Error("Course not found");
+        error.statusCode = 404;
+        throw error;
+      }
 
-    if (!lesson) {
-      return res.status(404).json({
-        success: false,
-        message: "Lesson not found",
-      });
-    }
-
-    // Ensure the lesson belongs to this course
-    const Module = require("../models/Module");
-    const lessonModule = await Module.findById(lesson.module);
-
-    if (
-      !lessonModule ||
-      lessonModule.course.toString() !== courseId
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Lesson does not belong to this course",
-      });
-    }
-
-    let progress = await Progress.findOne({
-      student: studentId,
-      course: courseId,
-    });
-
-    if (!progress) {
-      progress = await Progress.create({
+      const enrollment = await Enrollment.findOne({
         student: studentId,
         course: courseId,
-      });
-    }
+        status: "active",
+      }).session(session);
 
-    const alreadyCompleted = progress.completedLessons.some(
-      (id) => id.toString() === lessonId
-    );
+      if (!enrollment) {
+        const error = new Error("Active course enrollment not found");
+        error.statusCode = 403;
+        throw error;
+      }
 
-    if (!alreadyCompleted) {
-      progress.completedLessons.push(lessonId);
-    }
+      const lesson = await Lesson.findById(lessonId).session(session);
 
-    const modules = await Module.find({ course: courseId }).select("_id");
-    const moduleIds = modules.map((item) => item._id);
+      if (!lesson) {
+        const error = new Error("Lesson not found");
+        error.statusCode = 404;
+        throw error;
+      }
 
-    const totalLessons = await Lesson.countDocuments({
-      module: { $in: moduleIds },
-      status: "published",
+      const lessonModule = await Module.findOne({
+        _id: lesson.module,
+        course: courseId,
+      }).session(session);
+
+      if (!lessonModule) {
+        const error = new Error("Lesson does not belong to this course");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      let progress = await Progress.findOne({
+        student: studentId,
+        course: courseId,
+      }).session(session);
+
+      if (!progress) {
+        const error = new Error("Course progress not found");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      const alreadyCompleted = progress.completedLessons.some(
+        (id) => id.toString() === lessonId
+      );
+
+      if (!alreadyCompleted) {
+        progress.completedLessons.push(lessonId);
+      }
+
+      const modules = await Module.find({ course: courseId })
+        .select("_id")
+        .session(session);
+
+      const moduleIds = modules.map((item) => item._id);
+
+      const totalLessons = await Lesson.countDocuments({
+        module: { $in: moduleIds },
+        status: "published",
+      }).session(session);
+
+      const completedPublishedLessons = await Lesson.countDocuments({
+        _id: { $in: progress.completedLessons },
+        module: { $in: moduleIds },
+        status: "published",
+      }).session(session);
+
+      progress.progressPercentage =
+        totalLessons === 0
+          ? 0
+          : Math.round(
+              (completedPublishedLessons / totalLessons) * 100
+            );
+
+      progress.lastAccessedAt = new Date();
+
+      await progress.save({ session });
+
+      let handoff = null;
+
+      if (
+        course.price === 0 &&
+        progress.progressPercentage === 100
+      ) {
+        const lead = await Lead.findOne({
+          enrollment: enrollment._id,
+          currentTeam: "support",
+        }).session(session);
+
+        if (lead) {
+          const assignment = await assignLead({
+            leadId: lead._id,
+            team: "sales",
+            reason: "team_transfer",
+            session,
+          });
+
+          handoff = {
+            team: "sales",
+            assignedTo: assignment.assignment.assignedTo,
+          };
+        }
+      }
+
+      result = { progress, handoff };
     });
-
-    const completedPublishedLessons = await Lesson.countDocuments({
-      _id: { $in: progress.completedLessons },
-      module: { $in: moduleIds },
-      status: "published",
-    });
-
-    progress.progressPercentage =
-      totalLessons === 0
-        ? 0
-        : Math.round(
-            (completedPublishedLessons / totalLessons) * 100
-          );
-
-    progress.lastAccessedAt = new Date();
-
-    await progress.save();
 
     return res.status(200).json({
       success: true,
       message: "Lesson marked as completed",
-      progress,
+      ...result,
     });
   } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
     next(error);
+  } finally {
+    await session.endSession();
   }
 };
+
 
 module.exports = {
   getCourseProgress,

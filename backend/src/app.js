@@ -9,6 +9,9 @@ const adminRoutes = require("./routes/admin.routes");
 const progressRoutes = require("./routes/progress.routes");
 const submissionRoutes = require("./routes/submission.routes");
 const uploadRoutes = require("./routes/upload.routes");
+const enrollmentRoutes = require("./routes/enrollment.routes");
+const leadRoutes = require("./routes/lead.routes");
+const leadNoteRoutes = require("./routes/leadNote.routes");
 
 const app = express();
 
@@ -22,8 +25,9 @@ app.use("/api/auth", authRoutes);
 app.use("/api/progress", progressRoutes);
 app.use("/api/submissions", submissionRoutes);
 app.use("/api/upload", uploadRoutes);
-
-
+app.use("/api/enrollments", enrollmentRoutes);
+app.use("/api/leads", leadRoutes);
+app.use("/api/leads", leadNoteRoutes);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({

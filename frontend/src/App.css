@@ -1411,3 +1411,26 @@
     padding: 20px;
   }
 }
+
+.sidebar-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sidebar-user-info {
+  flex: 1;
+}
+
+.sidebar-logout {
+  border: none;
+  background: transparent;
+  color: #ef4444;
+  cursor: pointer;
+  padding: 9px;
+  border-radius: 8px;
+}
+
+.sidebar-logout:hover {
+  background: #fee2e2;
+}
