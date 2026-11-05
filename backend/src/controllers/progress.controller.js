@@ -184,6 +184,16 @@ const completeLesson = async (req, res, next) => {
             session,
           });
 
+          await Lead.findByIdAndUpdate(
+            lead._id,
+            {
+              $set: {
+                transferredAt: new Date(),
+              },
+            },
+            { session }
+          );
+
           handoff = {
             team: "sales",
             assignedTo: assignment.assignment.assignedTo,

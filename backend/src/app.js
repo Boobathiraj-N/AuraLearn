@@ -12,6 +12,8 @@ const uploadRoutes = require("./routes/upload.routes");
 const enrollmentRoutes = require("./routes/enrollment.routes");
 const leadRoutes = require("./routes/lead.routes");
 const leadNoteRoutes = require("./routes/leadNote.routes");
+const paymentRoutes = require("./routes/payment.routes");
+const courseRoutes = require("./routes/course.routes");
 
 const app = express();
 
@@ -28,6 +30,8 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/enrollments", enrollmentRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/leads", leadNoteRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/courses", courseRoutes);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({

@@ -55,12 +55,11 @@ function Login() {
 
       // Dashboard routing will be added with RBAC later.
       const roleRoutes = {
-        admin: "/admin",
-        student: "/student",
-        support: "/support",
-        sales: "/sales",
-      };
-
+  admin: "/admin",
+  student: "/student",
+  support: "/support",
+  sales: "/sales",
+};
       const dashboardPath = roleRoutes[result.user.role];
 
       if (!dashboardPath) {

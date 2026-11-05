@@ -51,5 +51,38 @@ export const uploadCourseImage = async (imageFile) => {
   return response.data;
 };
 
+// GET PUBLISHED COURSES (STUDENT)
+export const getPublishedCourses = async () => {
+  const response = await courseApi.get("/courses");
+  return response.data;
+};
+
+// ENROLL IN FREE COURSE
+export const enrollFreeCourse = async (courseId) => {
+  const response = await courseApi.post("/enrollments", {
+    courseId,
+  });
+
+  return response.data;
+};
+
+// GET ENROLLED COURSE CONTENT (STUDENT)
+export const getEnrolledCourseContent = async (courseId) => {
+  const response = await courseApi.get(
+    `/enrollments/my-courses/${courseId}/content`
+  );
+
+  return response.data;
+};
+
+// GET PUBLIC COURSE DETAILS WITH FREE PREVIEW
+export const getPublicCourseDetails = async (courseId) => {
+  const response = await courseApi.get(
+    `/courses/${courseId}/details`
+  );
+
+  return response.data;
+};
+
 
 export default courseApi;

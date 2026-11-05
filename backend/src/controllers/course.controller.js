@@ -1,7 +1,8 @@
 
 const mongoose = require("mongoose");
 const Course = require("../models/Course");
-
+const Module = require("../models/Module");
+const Lesson = require("../models/Lesson");
 
 const generateSlug = (title) => {
   return title
@@ -66,6 +67,25 @@ const getAllCourses = async (req, res, next) => {
     const courses = await Course.find()
       .populate("createdBy", "name email")
       .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: courses.length,
+      courses,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET PUBLISHED COURSES (PUBLIC)
+const getPublishedCourses = async (req, res, next) => {
+  try {
+    const courses = await Course.find({
+      status: "published",
+    }).select(
+      "title slug description introduction category level price thumbnail durationMinutes"
+    ).sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
@@ -192,10 +212,89 @@ const deleteCourse = async (req, res, next) => {
   }
 };
 
+
+// GET PUBLIC COURSE DETAILS WITH PREVIEW LESSONS
+const getPublicCourseDetails = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid course ID",
+      });
+    }
+
+    const course = await Course.findOne({
+      _id: id,
+      status: "published",
+    }).select(
+      "title slug description introduction category level price thumbnail durationMinutes"
+    );
+
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: "Published course not found",
+      });
+    }
+
+    const modules = await Module.find({
+      course: id,
+      status: "published",
+    })
+      .sort({ order: 1 })
+      .lean();
+
+    const moduleIds = modules.map((module) => module._id);
+
+    const lessons = await Lesson.find({
+      module: { $in: moduleIds },
+      status: "published",
+    })
+      .select(
+        "module title description durationMinutes order isFreePreview videoUrl"
+      )
+      .sort({ order: 1 })
+      .lean();
+
+    const modulesWithLessons = modules.map((module) => ({
+      ...module,
+      lessons: lessons
+        .filter(
+          (lesson) =>
+            lesson.module.toString() === module._id.toString()
+        )
+        .map((lesson) => {
+          const { videoUrl, ...lessonDetails } = lesson;
+
+          return lesson.isFreePreview
+            ? lesson
+            : lessonDetails;
+        }),
+    }));
+
+    const totalLessons = lessons.length;
+
+    return res.status(200).json({
+      success: true,
+      course,
+      totalModules: modules.length,
+      totalLessons,
+      modules: modulesWithLessons,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 module.exports = {
   createCourse,
   getAllCourses,
+  getPublishedCourses,
   getCourseById,
   updateCourse,
   deleteCourse,
+  getPublicCourseDetails,
 };

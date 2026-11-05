@@ -11,12 +11,14 @@ import {
   X,
   LogOut,
   ClipboardList,
+  Layers,
 } from "lucide-react";
 
 const adminMenuItems = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
   { label: "Staff Management", path: "/admin/staff", icon: Users },
   { label: "Courses", path: "/admin/courses", icon: BookOpen },
+  { label: "Modules", path: "/admin/modules", icon: Layers },
   { label: "Lessons", path: "/admin/lessons", icon: BookOpen },
   { label: "Settings", path: "/admin/settings", icon: Settings },
 ];
