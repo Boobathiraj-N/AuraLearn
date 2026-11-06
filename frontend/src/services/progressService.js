@@ -2,7 +2,10 @@ import authAPI from "./authService";
 
 // Get student's course progress
 export const getCourseProgress = async (courseId) => {
-  const response = await authAPI.get(`/progress/courses/${courseId}`);
+  const response = await authAPI.get(
+    `/progress/courses/${courseId}`
+  );
+
   return response.data;
 };
 

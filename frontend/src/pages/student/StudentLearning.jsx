@@ -3,7 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { getEnrolledCourseContent } from "../../services/courseService";
-import { getCourseProgress } from "../../services/progressService";
+import {
+  getCourseProgress,
+  completeLesson,
+} from "../../services/progressService";
 
 const StudentLearning = () => {
   const { courseId } = useParams();
@@ -14,6 +17,8 @@ const StudentLearning = () => {
   const [error, setError] = useState("");
   const [selectedLesson, setSelectedLesson] = useState(null);
   const [expandedModules, setExpandedModules] = useState([]);
+  const [completing, setCompleting] = useState(false);
+const [completionError, setCompletionError] = useState("");
 
   useEffect(() => {
     const fetchLearningData = async () => {
@@ -81,6 +86,31 @@ const StudentLearning = () => {
     completedLessons.some(
       (item) => item === lessonId || item?._id === lessonId
     );
+
+  const handleCompleteLesson = async () => {
+  if (!selectedLesson || isLessonCompleted(selectedLesson._id)) {
+    return;
+  }
+
+  try {
+    setCompleting(true);
+    setCompletionError("");
+
+    const response = await completeLesson(
+      courseId,
+      selectedLesson._id
+    );
+
+    setProgress(response.progress);
+  } catch (error) {
+    setCompletionError(
+      error.response?.data?.message ||
+        "Failed to complete lesson"
+    );
+  } finally {
+    setCompleting(false);
+  }
+};
 
   const completedCount = allLessons.filter((lesson) =>
     isLessonCompleted(lesson._id)
@@ -246,6 +276,31 @@ const StudentLearning = () => {
                 )}
 
                 <div className="my-6 border-t border-white/10" />
+
+                <div className="mb-5">
+                  {completionError && (
+                    <p className="mb-3 text-sm text-red-400">
+                      {completionError}
+                    </p>
+                  )}
+
+                  <button
+                    onClick={handleCompleteLesson}
+                    disabled={
+                      completing ||
+                      !selectedLesson ||
+                      isLessonCompleted(selectedLesson._id)
+                    }
+                    className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {completing
+                      ? "Saving..."
+                      : selectedLesson &&
+                        isLessonCompleted(selectedLesson._id)
+                      ? "✓ Lesson Completed"
+                      : "Mark as Complete"}
+                  </button>
+                </div>
 
                 {/* Previous and Next */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
