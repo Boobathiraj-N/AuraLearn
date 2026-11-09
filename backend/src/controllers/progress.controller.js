@@ -9,6 +9,9 @@ const Enrollment = require("../models/Enrollment");
 const Lead = require("../models/Lead");
 
 const { assignLead } = require("../services/leadAssignment.service");
+const crypto = require("crypto");
+const PDFDocument = require("pdfkit");
+const path = require("path");
 
 // GET STUDENT'S COURSE PROGRESS
 const getCourseProgress = async (req, res, next) => {
@@ -56,6 +59,49 @@ const getCourseProgress = async (req, res, next) => {
     next(error);
   }
 };
+
+
+// GET COURSE COMPLETION CERTIFICATE
+const getCourseCertificate = async (req, res, next) => {
+  try {
+    const { courseId } = req.params;
+    const studentId = req.user.id;
+
+    if (!mongoose.isValidObjectId(courseId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid course ID",
+      });
+    }
+
+    const progress = await Progress.findOne({
+      student: studentId,
+      course: courseId,
+    })
+      .populate("student", "name email")
+      .populate("course", "title");
+
+    if (!progress || progress.progressPercentage !== 100 || !progress.certificateId) {
+      return res.status(403).json({
+        success: false,
+        message: "Complete the course to unlock your certificate",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      certificate: {
+        certificateId: progress.certificateId,
+        studentName: progress.student.name,
+        courseName: progress.course.title,
+        issuedAt: progress.certificateIssuedAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 // MARK LESSON AS COMPLETED
 
@@ -163,6 +209,19 @@ const completeLesson = async (req, res, next) => {
 
       progress.lastAccessedAt = new Date();
 
+      // Generate certificate when course reaches 100%
+      if (
+        progress.progressPercentage === 100 &&
+        !progress.certificateId
+      ) {
+        progress.certificateId = `AL-${Date.now()}-${crypto
+          .randomBytes(4)
+          .toString("hex")
+          .toUpperCase()}`;
+
+        progress.certificateIssuedAt = new Date();
+      }
+
       await progress.save({ session });
 
       let handoff = null;
@@ -223,8 +282,127 @@ const completeLesson = async (req, res, next) => {
   }
 };
 
+// DOWNLOAD COURSE CERTIFICATE PDF
+const downloadCourseCertificate = async (req, res, next) => {
+  try {
+    const { courseId } = req.params;
+    const studentId = req.user.id;
+
+    if (!mongoose.isValidObjectId(courseId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid course ID",
+      });
+    }
+
+    const progress = await Progress.findOne({
+      student: studentId,
+      course: courseId,
+    })
+      .populate("student", "name")
+      .populate("course", "title");
+
+    if (
+      !progress ||
+      progress.progressPercentage !== 100 ||
+      !progress.certificateId
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Complete the course to download your certificate",
+      });
+    }
+
+    const doc = new PDFDocument({
+      size: "A4",
+      layout: "landscape",
+      margin: 50,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=certificate-${progress.certificateId}.pdf`
+    );
+
+    const logoPath = path.join(
+  __dirname,
+  "../assets/auralearn-logo.png"
+);
+
+    doc.image(logoPath, 360, 45, {
+      width: 80,
+    });
+
+    doc.pipe(res);
+
+    // Certificate design
+    doc.rect(20, 20, 802, 555).lineWidth(4).stroke("#D4AF37");
+
+    doc
+      .fontSize(32)
+      .fillColor("#1E3A8A")
+      .text("CERTIFICATE OF COMPLETION", 50, 100, {
+        align: "center",
+      });
+
+    doc
+      .fontSize(18)
+      .fillColor("#333333")
+      .text("This certificate is proudly presented to", 50, 190, {
+        align: "center",
+      });
+
+    doc
+      .fontSize(30)
+      .fillColor("#111827")
+      .text(progress.student.name, 50, 240, {
+        align: "center",
+      });
+
+    doc
+      .fontSize(18)
+      .fillColor("#333333")
+      .text("For successfully completing the course", 50, 300, {
+        align: "center",
+      });
+
+    doc
+      .fontSize(24)
+      .fillColor("#1E3A8A")
+      .text(progress.course.title, 50, 345, {
+        align: "center",
+      });
+
+    doc
+      .fontSize(12)
+      .fillColor("#555555")
+      .text(
+        `Certificate ID: ${progress.certificateId}`,
+        50,
+        440,
+        { align: "center" }
+      );
+
+    doc.text(
+      `Completion Date: ${new Date(
+        progress.certificateIssuedAt
+      ).toLocaleDateString("en-IN")}`,
+      50,
+      465,
+      { align: "center" }
+    );
+
+    doc.end();
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 module.exports = {
   getCourseProgress,
   completeLesson,
+  getCourseCertificate,
+  downloadCourseCertificate,
 };

@@ -9,6 +9,43 @@ const MyCourses = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const [downloadingId, setDownloadingId] = useState(null);
+  const [downloadError, setDownloadError] = useState("");
+
+  const handleDownloadCertificate = async (courseId) => {
+    try {
+    setDownloadingId(courseId);
+    setDownloadError("");
+
+    const response = await authAPI.get(
+    `/progress/courses/${courseId}/certificate/download`,
+    {
+    responseType: "blob",
+    }
+    );
+
+    const blob = new Blob([response.data], {
+    type: "application/pdf",
+    });
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `auralearn-certificate-${courseId}.pdf`;
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    window.URL.revokeObjectURL(url);
+    } catch (error) {
+    setDownloadError("Certificate download failed. Please try again.");
+    } finally {
+    setDownloadingId(null);
+    }
+  };
+
 
   useEffect(() => {
     const fetchMyCourses = async () => {
@@ -87,6 +124,12 @@ const MyCourses = () => {
             </p>
 
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {downloadError && (
+                <p className="mb-4 text-sm text-red-400">
+                  {downloadError}
+                </p>
+              )}
+
               {courses.map((enrollment) => {
                 const course = enrollment.course;
 
@@ -173,6 +216,18 @@ const MyCourses = () => {
                           ? "Review Course"
                           : "Continue Learning"}
                       </button>
+
+                      {progress === 100 && (
+                        <button
+                          onClick={() => handleDownloadCertificate(course._id)}
+                          disabled={downloadingId === course._id}
+                          className="mt-3 w-full rounded-lg border border-emerald-500 bg-emerald-500/10 px-4 py-3 font-medium text-emerald-400 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {downloadingId === course._id
+                            ? "Downloading..."
+                            : "🏆 Download Certificate"}
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

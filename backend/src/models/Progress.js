@@ -46,6 +46,16 @@ const progressSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+
+        certificateId: {
+      type: String,
+      default: null,
+    },
+
+    certificateIssuedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );
