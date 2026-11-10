@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import authAPI from "../../services/authService";
+import { getAuthUser } from "../../services/authService";
+import CourseFeedbackSection from "./CourseFeedbackSection";
+
 
 const MyCourses = () => {
   const [courses, setCourses] = useState([]);
@@ -11,6 +14,11 @@ const MyCourses = () => {
   const navigate = useNavigate();
   const [downloadingId, setDownloadingId] = useState(null);
   const [downloadError, setDownloadError] = useState("");
+    
+  // Current logged-in student
+  const currentUser = getAuthUser();
+  const studentId = currentUser?.id;
+
 
   const handleDownloadCertificate = async (courseId) => {
     try {
@@ -228,6 +236,14 @@ const MyCourses = () => {
                             : "🏆 Download Certificate"}
                         </button>
                       )}
+
+                      {progress === 100 && studentId && (
+                        <CourseFeedbackSection
+                          courseId={course._id}
+                          studentId={studentId}
+                        />
+                      )}
+
                     </div>
                   </div>
                 );

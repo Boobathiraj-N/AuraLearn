@@ -330,9 +330,9 @@ const downloadCourseCertificate = async (req, res, next) => {
   "../assets/auralearn-logo.png"
 );
 
-    doc.image(logoPath, 360, 45, {
-      width: 80,
-    });
+    doc.image(logoPath, 70, 55, {
+  width: 80,
+});
 
     doc.pipe(res);
 

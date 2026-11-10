@@ -20,6 +20,7 @@ import {
 } from "../../services/courseService";
 
 import { startRazorpayPayment } from "../../utils/razorpayPayment";
+import authAPI from "../../services/authService";
 
 const CourseIntroduction = () => {
   const { courseId } = useParams();
@@ -31,6 +32,7 @@ const CourseIntroduction = () => {
   const [openModule, setOpenModule] = useState(0);
   const [selectedLesson, setSelectedLesson] = useState(null);
   const [enrolling, setEnrolling] = useState(false);
+  const [feedbackData, setFeedbackData] = useState(null);
 
   useEffect(() => {
     const fetchCourseDetails = async () => {
@@ -53,8 +55,29 @@ const CourseIntroduction = () => {
     fetchCourseDetails();
   }, [courseId]);
 
+  useEffect(() => {
+  const fetchCourseFeedback = async () => {
+    try {
+      const response = await authAPI.get(
+        `/course-feedback/${courseId}`
+      );
+
+      setFeedbackData(response.data);
+    } catch (error) {
+      console.error("Failed to load course feedback:", error);
+    }
+  };
+
+  fetchCourseFeedback();
+  }, [courseId]);
+
   const course = courseData?.course;
   const modules = courseData?.modules || [];
+
+  const averageRating = Number(feedbackData?.averageRating || 0);
+
+  const shouldShowReviews =
+  feedbackData?.totalReviews > 0 && averageRating > 3.5;
 
   const totalPreviewLessons = modules.reduce(
     (total, module) =>
@@ -239,6 +262,65 @@ const CourseIntroduction = () => {
             </div>
           </aside>
         </div>
+
+
+        {/* Course Ratings and Reviews */}
+          {shouldShowReviews && (
+            <section className="mt-14">
+              <h2 className="text-2xl font-bold">
+                Student Reviews
+              </h2>
+
+              {/* Average Rating */}
+              <div className="mt-5 rounded-xl border border-white/10 bg-[#18181b] p-6">
+                <div className="flex items-center gap-3">
+                  <span className="text-4xl font-bold">
+                    {averageRating.toFixed(1)}
+                  </span>
+
+                  <div>
+                    <p className="text-yellow-400">
+                      {"★".repeat(Math.round(averageRating))}
+                    </p>
+
+                    <p className="text-sm text-gray-400">
+                      Based on {feedbackData.totalReviews} reviews
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Individual Reviews */}
+              <div className="mt-6 max-w-4xl space-y-4">
+                {feedbackData.feedbacks.map((feedback) => (
+                  <div
+                    key={feedback._id}
+                    className="rounded-xl border border-white/10 bg-[#18181b] p-5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold">
+                        {feedback.student?.name || "Student"}
+                      </h3>
+
+                      <span className="text-sm text-yellow-400">
+                        {"★".repeat(feedback.rating)}
+                      </span>
+                    </div>
+
+                    {feedback.review && (
+                      <p className="mt-3 text-sm leading-6 text-gray-400">
+                        {feedback.review}
+                      </p>
+                    )}
+
+                    <p className="mt-3 text-xs text-gray-500">
+                      {new Date(feedback.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
         {/* Course Curriculum */}
         <section className="mt-14">
