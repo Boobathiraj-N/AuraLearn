@@ -6,16 +6,18 @@ const crypto = require("crypto");
 const mongoose = require("mongoose");
 const Progress = require("../models/Progress");
 const Lead = require("../models/Lead");
+const { assignLead } = require("../services/leadAssignment.service");
+
 
 const createPaymentOrder = async (req, res, next) => {
   try {
     const { courseId } = req.body;
     const studentId = req.user.id;
 
-    if (!courseId) {
+    if (!courseId || !mongoose.Types.ObjectId.isValid(courseId)) {
       return res.status(400).json({
         success: false,
-        message: "Course ID is required",
+        message: "Valid course ID is required",
       });
     }
 
@@ -32,14 +34,14 @@ const createPaymentOrder = async (req, res, next) => {
     }
 
     if (
-    typeof course.price !== "number" ||
-    !Number.isFinite(course.price) ||
-    course.price <= 0
+      typeof course.price !== "number" ||
+      !Number.isFinite(course.price) ||
+      course.price <= 0
     ) {
-    return res.status(400).json({
+      return res.status(400).json({
         success: false,
         message: "Invalid course price",
-    });
+      });
     }
 
     const existingEnrollment = await Enrollment.findOne({
@@ -57,15 +59,44 @@ const createPaymentOrder = async (req, res, next) => {
 
     const amount = Math.round(course.price * 100);
 
+    // Create Razorpay order
     const order = await razorpay.orders.create({
       amount,
       currency: "INR",
       receipt: `course_${course._id}_${Date.now()}`,
     });
 
+    // Find or create Sales Lead
+    let lead = await Lead.findOne({
+      student: studentId,
+      course: course._id,
+      currentTeam: "sales",
+      status: { $ne: "converted" },
+    });
+
+    if (!lead) {
+      lead = await Lead.create({
+        student: studentId,
+        course: course._id,
+        currentTeam: "sales",
+        status: "new",
+        temperature: "cold",
+      });
+
+      const assignment = await assignLead({
+        leadId: lead._id,
+        team: "sales",
+        reason: "initial_assignment",
+      });
+
+      lead = assignment.lead;
+    }
+
+    // Create payment history
     await PaymentHistory.create({
       student: studentId,
       course: course._id,
+      lead: lead._id,
       amount,
       currency: "INR",
       razorpayOrderId: order.id,
@@ -86,6 +117,7 @@ const createPaymentOrder = async (req, res, next) => {
     next(error);
   }
 };
+
 
 const verifyPayment = async (req, res, next) => {
   try {
@@ -180,6 +212,17 @@ const verifyPayment = async (req, res, next) => {
                 }
 
             if (
+              currentPayment.status === "captured" &&
+              currentPayment.razorpayPaymentId === razorpay_payment_id
+            ) {
+              return;
+            }
+
+            if (currentPayment.status !== "created") {
+              throw new Error("Payment cannot be verified in its current status");
+            }
+
+            if (
                 currentPayment.razorpayPaymentId &&
                 currentPayment.razorpayPaymentId !== razorpay_payment_id
                 ) {
@@ -225,22 +268,24 @@ const verifyPayment = async (req, res, next) => {
             );
 
             currentPayment.enrollment = enrollment._id;
-            const lead = await Lead.findOne({
-                student: currentPayment.student,
-                course: currentPayment.course,
-                currentTeam: "sales",
-                status: { $ne: "converted" },
-                }).session(session);
+            const lead = currentPayment.lead
+              ? await Lead.findById(currentPayment.lead).session(session)
+              : null;
 
-                if (lead) {
+            if (lead) {
+              if (lead.status !== "converted") {
                 lead.status = "converted";
                 lead.convertedAt = new Date();
 
                 await lead.save({ session });
+              }
 
-                currentPayment.lead = lead._id;
-                }
-            await currentPayment.save({ session }); // itha delete pannra vaippu irukku
+              currentPayment.lead = lead._id;
+            } else {
+              currentPayment.lead = null;
+            }
+
+            await currentPayment.save({ session });
         });
         } finally {
         await session.endSession();

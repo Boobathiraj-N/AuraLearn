@@ -16,9 +16,28 @@ export const startRazorpayPayment = async (courseId) => {
       description: "Course Enrollment",
       order_id: orderData.order.id,
 
+      // handler: async function (response) {
+      //   try {
+      //     // 2. Verify payment on backend
+      //     const result = await verifyPayment(response);
+
+      //     alert(result.message);
+      //   } catch (error) {
+      //     alert(
+      //       error.response?.data?.message ||
+      //         "Payment verification failed"
+      //     );
+      //   }
+      // },
+
+      // ithu summa temporary code than 
+
       handler: async function (response) {
+        console.log("Razorpay Order ID:", response.razorpay_order_id);
+        console.log("Razorpay Payment ID:", response.razorpay_payment_id);
+        console.log("Razorpay Signature:", response.razorpay_signature);
+
         try {
-          // 2. Verify payment on backend
           const result = await verifyPayment(response);
 
           alert(result.message);
@@ -29,7 +48,6 @@ export const startRazorpayPayment = async (courseId) => {
           );
         }
       },
-
       modal: {
         ondismiss: function () {
           console.log("Payment window closed");

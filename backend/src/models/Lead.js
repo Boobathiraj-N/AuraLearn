@@ -17,8 +17,7 @@ const leadSchema = new mongoose.Schema(
     enrollment: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Enrollment",
-      required: true,
-      unique: true,
+      default: null,
     },
 
     currentTeam: {
@@ -69,5 +68,14 @@ const leadSchema = new mongoose.Schema(
 
 leadSchema.index({ assignedTo: 1, currentTeam: 1 });
 leadSchema.index({ student: 1, course: 1 });
+leadSchema.index(
+  { enrollment: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      enrollment: { $type: "objectId" },
+    },
+  }
+);
 
 module.exports = mongoose.model("Lead", leadSchema);
