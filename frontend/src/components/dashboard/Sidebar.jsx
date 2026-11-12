@@ -1,6 +1,6 @@
 
-import { NavLink, useNavigate } from "react-router-dom";
-import { logoutUser, getAuthUser } from "../../services/authService";
+import { NavLink } from "react-router-dom";
+import { getAuthUser } from "../../services/authService";
 
 import {
   LayoutDashboard,
@@ -9,7 +9,6 @@ import {
   Settings,
   GraduationCap,
   X,
-  LogOut,
   ClipboardList,
   Layers,
 } from "lucide-react";
@@ -37,7 +36,6 @@ const staffMenuItems = (role) => [
 ];
 
 function Sidebar({ open, onClose }) {
-  const navigate = useNavigate();
   const user = getAuthUser();
   const role = user?.role;
 
@@ -48,10 +46,7 @@ function Sidebar({ open, onClose }) {
         ? staffMenuItems(role)
         : [];
 
-  const handleLogout = () => {
-    logoutUser();
-    navigate("/login", { replace: true });
-  };
+
 
   return (
     <>
@@ -107,18 +102,12 @@ function Sidebar({ open, onClose }) {
 
           <div className="sidebar-user-info">
             <strong>AuraLearn AI</strong>
-            <p>{role ? role.charAt(0).toUpperCase() + role.slice(1) : "Workspace"}</p>
+            <p>
+              {role
+                ? role.charAt(0).toUpperCase() + role.slice(1)
+                : "Workspace"}
+            </p>
           </div>
-
-          <button
-            type="button"
-            className="sidebar-logout"
-            onClick={handleLogout}
-            title="Sign out"
-            aria-label="Sign out"
-          >
-            <LogOut size={19} />
-          </button>
         </div>
       </aside>
     </>

@@ -1,3 +1,4 @@
+
 import { Navigate, Outlet } from "react-router-dom";
 import { getAuthUser } from "../../services/authService";
 
@@ -10,8 +11,8 @@ function ProtectedRoute({ allowedRoles }) {
     return <Navigate to="/login" replace />;
   }
 
-  // Check role authorization
-  if (!allowedRoles.includes(user.role)) {
+  // Check role authorization only when roles are specified
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/unauthorized" replace />;
   }
 

@@ -24,7 +24,9 @@ import CourseListing from "./pages/student/CourseListing";
 import MyCourses from "./pages/student/MyCourses";
 import StudentLearning from "./pages/student/StudentLearning";
 import CourseIntroduction from "./pages/student/CourseIntroduction";
-
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import ChangePassword from "./pages/ChangePassword";
 import "./App.css";
 
 function App() {
@@ -32,11 +34,24 @@ function App() {
     <BrowserRouter>
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<Navigate to="/register" replace />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/portal/set-password" element={<SetStaffPassword />} />
         <Route path="/login-success" element={<LoginSuccess />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        
+        {/* All authenticated users */}
+
+        <Route element={<ProtectedRoute />}>
+          <Route
+            path="/change-password"
+            element={<ChangePassword />}
+          />
+        </Route>
+
+
 
         {/* Student Protected Routes */}
         <Route element={<ProtectedRoute allowedRoles={["student"]} />}>

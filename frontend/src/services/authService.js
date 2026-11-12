@@ -79,5 +79,33 @@ export const loginUser = async (data) => {
   return response.data;
 };
 
+
+// Forgot Password
+export const forgotPassword = async (email) => {
+  const response = await authAPI.post("/auth/forgot-password", {
+    email,
+  });
+  return response.data;
+};
+
+// Reset Password
+export const resetPassword = async (token, password) => {
+  const response = await authAPI.post(
+    `/auth/reset-password/${token}`,
+    { password }
+  );
+  return response.data;
+};
+
+// Change Password
+export const changePassword = async (data) => {
+  const response = await authAPI.patch(
+    "/auth/change-password",
+    data
+  );
+  return response.data;
+};
+
+
 export default authAPI;
 

@@ -8,6 +8,9 @@ const {
   verifyStudentOtp,
   loginUser,
   activateStaff,
+  forgotPassword,
+  resetPassword,
+  changePassword,
 } = require("../controllers/auth.controller");
 
 const router = express.Router();
@@ -38,6 +41,9 @@ router.post("/register", registrationLimiter, registerStudent);
 router.post("/verify-otp", otpVerificationLimiter, verifyStudentOtp);
 router.post("/login", loginUser);
 router.post("/activate-staff", activateStaff);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password/:token", resetPassword);
+router.patch("/change-password", protect, changePassword);
 
 router.get("/me", protect, (req, res) => {
   return res.status(200).json({

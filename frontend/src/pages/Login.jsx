@@ -162,7 +162,17 @@ function Login() {
                 >
                   {showPassword ? "Hide" : "Show"}
                 </button>
+
+                
               </div>
+              <div className="flex justify-end">
+                  <Link
+                    to="/forgot-password"
+                    className="text-sm font-medium text-blue-600 hover:underline"
+                  >
+                    Forgot Password?
+                  </Link>
+                </div>
             </div>
 
             {error && (
