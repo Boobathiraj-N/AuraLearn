@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getPublishedCourses,
+  getMyCourses,
   enrollFreeCourse,
 } from "../../services/courseService";
 import { startRazorpayPayment } from "../../utils/razorpayPayment";
@@ -35,22 +36,39 @@ const CourseListing = () => {
   const userName = user.name || "Student";
   const avatarLetter = userName.charAt(0).toUpperCase();
 
-  useEffect(() => {
-    const fetchCourses = async () => {
-      try {
-        const data = await getPublishedCourses();
-        setCourses(data.courses || []);
-      } catch (error) {
-        setError(
-          error.response?.data?.message || "Failed to load courses"
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
 
-    fetchCourses();
-  }, []);
+useEffect(() => {
+  const fetchCourses = async () => {
+    try {
+      const [courseData, enrolledData] = await Promise.all([
+        getPublishedCourses(),
+        getMyCourses(),
+      ]);
+
+      setCourses(courseData.courses || []);
+
+      // Extract enrolled course IDs
+      const ids = (enrolledData.courses || [])
+        .map((item) => {
+          return item.course?._id || item.course;
+        })
+        .filter(Boolean)
+        .map(String);
+
+      setEnrolledIds(ids);
+    } catch (error) {
+      setError(
+        error.response?.data?.message ||
+          "Failed to load courses"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchCourses();
+}, []);
+
 
   const filteredCourses = useMemo(() => {
     return courses.filter((course) => {
@@ -80,6 +98,7 @@ const CourseListing = () => {
     });
   }, [courses, search, activeCategory]);
 
+
   const handleEnroll = async (event, course) => {
     event.stopPropagation();
     setMessage("");
@@ -88,21 +107,38 @@ const CourseListing = () => {
       setEnrollingId(course._id);
 
       if (Number(course.price) === 0) {
+        // Free course enrollment
         const result = await enrollFreeCourse(course._id);
 
-        setEnrolledIds((prev) => [...prev, course._id]);
+        setEnrolledIds((prev) => [
+          ...new Set([...prev, String(course._id)]),
+        ]);
+
         setMessage(result.message || "Successfully enrolled!");
       } else {
-        await startRazorpayPayment(course._id);
+        // Paid course enrollment
+        const result = await startRazorpayPayment(course._id);
+
+        setEnrolledIds((prev) => [
+          ...new Set([...prev, String(course._id)]),
+        ]);
+
+        setMessage(
+          result.message ||
+            "Payment successful! You are now enrolled."
+        );
       }
     } catch (error) {
       setMessage(
-        error.response?.data?.message || "Enrollment failed. Please try again."
+        error.response?.data?.message ||
+          error.message ||
+          "Enrollment failed. Please try again."
       );
     } finally {
       setEnrollingId(null);
     }
   };
+
 
   const handleLogout = () => {
     localStorage.removeItem("authToken");
@@ -406,7 +442,7 @@ const CourseListing = () => {
               <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
                 {filteredCourses.map((course) => {
                   const isFree = Number(course.price) === 0;
-                  const isEnrolled = enrolledIds.includes(course._id);
+                  const isEnrolled = enrolledIds.includes(String(course._id));
 
                   return (
                     <article

@@ -51,6 +51,12 @@ export const uploadCourseImage = async (imageFile) => {
   return response.data;
 };
 
+// GET LOGGED-IN STUDENT'S ENROLLED COURSES
+export const getMyCourses = async () => {
+  const response = await courseApi.get("/enrollments/my-courses");
+  return response.data;
+};
+
 // GET PUBLISHED COURSES (STUDENT)
 export const getPublishedCourses = async () => {
   const response = await courseApi.get("/courses");
