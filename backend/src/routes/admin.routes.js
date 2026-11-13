@@ -9,6 +9,7 @@ const {
   getStaffById,
   updateStaff,
   updateStaffStatus,
+  getDashboardStats, // New
 } = require("../controllers/admin.controller");
 
 const {
@@ -51,6 +52,13 @@ const router = express.Router();
 router.post("/staff", protect, authorizeRole("admin"), createStaff);
 router.get("/staff", protect, authorizeRole("admin"), getAllStaff);
 router.get("/staff/:id", protect, authorizeRole("admin"), getStaffById);
+
+router.get(
+  "/dashboard/stats",
+  protect,
+  authorizeRole("admin"),
+  getDashboardStats
+);
 
 router.put(
   "/staff/:id",

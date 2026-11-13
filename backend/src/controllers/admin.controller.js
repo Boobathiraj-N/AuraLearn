@@ -2,6 +2,10 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const User = require("../models/User");
 const { sendStaffActivationEmail } = require("../utils/emailService");
+const Course = require("../models/Course");
+const Progress = require("../models/Progress");
+const Submission = require("../models/Submission");
+
 
 const createStaff = async (req, res, next) => {
   try {
@@ -401,6 +405,60 @@ const updateStaffStatus = async (req, res, next) => {
   }
 };
 
+const getDashboardStats = async (req, res, next) => {
+  try {
+    // Last 7 days date
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    // Fetch all statistics parallel-ah
+    const [
+      totalStudents,
+      totalSalesStaff,
+      totalSupportStaff,
+      totalCourses,
+      activeProgressStudents,
+      activeSubmissionStudents,
+    ] = await Promise.all([
+      User.countDocuments({ role: "student" }),
+
+      User.countDocuments({ role: "sales" }),
+
+      User.countDocuments({ role: "support" }),
+
+      Course.countDocuments(),
+
+      Progress.distinct("student", {
+        lastAccessedAt: { $gte: sevenDaysAgo },
+      }),
+
+      Submission.distinct("student", {
+        createdAt: { $gte: sevenDaysAgo },
+      }),
+    ]);
+
+    // Unique active students from both collections
+    const activeStudents = new Set([
+      ...activeProgressStudents.map(String),
+      ...activeSubmissionStudents.map(String),
+    ]);
+
+    const totalStaff = totalSalesStaff + totalSupportStaff;
+
+    return res.status(200).json({
+      success: true,
+      stats: {
+        totalStudents,
+        totalStaff,
+        totalCourses,
+        learningActivity: activeStudents.size,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 module.exports = {
   createStaff,
@@ -408,4 +466,5 @@ module.exports = {
   getStaffById,
   updateStaff,
   updateStaffStatus,
+  getDashboardStats,
 };
