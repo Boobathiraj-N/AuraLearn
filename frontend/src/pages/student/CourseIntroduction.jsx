@@ -17,6 +17,7 @@ import {
 import {
   getPublicCourseDetails,
   enrollFreeCourse,
+  getMyCourses,
 } from "../../services/courseService";
 
 import { startRazorpayPayment } from "../../utils/razorpayPayment";
@@ -33,6 +34,9 @@ const CourseIntroduction = () => {
   const [selectedLesson, setSelectedLesson] = useState(null);
   const [enrolling, setEnrolling] = useState(false);
   const [feedbackData, setFeedbackData] = useState(null);
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [checkingEnrollment, setCheckingEnrollment] = useState(true);
+
 
   useEffect(() => {
     const fetchCourseDetails = async () => {
@@ -71,6 +75,29 @@ const CourseIntroduction = () => {
   fetchCourseFeedback();
   }, [courseId]);
 
+  useEffect(() => {
+  const checkEnrollment = async () => {
+    try {
+      setCheckingEnrollment(true);
+
+      const data = await getMyCourses();
+
+      const enrolled = (data.courses || []).some(
+        (item) =>
+          String(item.course?._id || item.course) === String(courseId)
+      );
+
+      setIsEnrolled(enrolled);
+    } catch (error) {
+      console.error("Failed to check enrollment:", error);
+    } finally {
+      setCheckingEnrollment(false);
+    }
+  };
+
+  checkEnrollment();
+  }, [courseId]);
+
   const course = courseData?.course;
   const modules = courseData?.modules || [];
 
@@ -99,29 +126,38 @@ const CourseIntroduction = () => {
       : `${hours} hours`;
   };
 
-  const handleEnrollment = async () => {
-    try {
-      setEnrolling(true);
+const handleEnrollment = async () => {
+  try {
+    setEnrolling(true);
 
-      if (course.price === 0) {
-        const result = await enrollFreeCourse(course._id);
+    if (Number(course.price) === 0) {
+      const result = await enrollFreeCourse(course._id);
 
-        alert(result.message || "Successfully enrolled!");
+      setIsEnrolled(true);
 
-        navigate("/student/my-courses");
-      } else {
-        await startRazorpayPayment(course._id);
-      }
-    } catch (err) {
-      alert(
-        err.response?.data?.message ||
-          err.message ||
-          "Something went wrong."
-      );
-    } finally {
-      setEnrolling(false);
+      alert(result.message || "Successfully enrolled!");
+
+      navigate(`/student/courses/${course._id}/learn`);
+    } else {
+      // Razorpay payment + backend verification
+      const result = await startRazorpayPayment(course._id);
+
+      setIsEnrolled(true);
+
+      alert(result.message || "Payment successful!");
+
+      navigate(`/student/courses/${course._id}/learn`);
     }
-  };
+  } catch (err) {
+    alert(
+      err.response?.data?.message ||
+        err.message ||
+        "Something went wrong."
+    );
+  } finally {
+    setEnrolling(false);
+  }
+};
 
   if (loading) {
     return (
@@ -224,15 +260,25 @@ const CourseIntroduction = () => {
               </h2>
 
               <button
-                onClick={handleEnrollment}
-                disabled={enrolling}
+                onClick={() => {
+                  if (isEnrolled) {
+                    navigate(`/student/courses/${course._id}/learn`);
+                  } else {
+                    handleEnrollment();
+                  }
+                }}
+                disabled={enrolling || checkingEnrollment}
                 className="mt-6 w-full rounded-xl bg-violet-600 py-3 font-semibold transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {enrolling
+                {checkingEnrollment
+                  ? "Checking..."
+                  : enrolling
                   ? "Please wait..."
-                  : course.price === 0
-                    ? "Enroll Now"
-                    : "Buy Now"}
+                  : isEnrolled
+                  ? "Continue Learning"
+                  : Number(course.price) === 0
+                  ? "Enroll Now"
+                  : "Buy Now"}
               </button>
 
               <button
