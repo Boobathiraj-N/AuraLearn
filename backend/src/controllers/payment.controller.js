@@ -7,6 +7,9 @@ const mongoose = require("mongoose");
 const Progress = require("../models/Progress");
 const Lead = require("../models/Lead");
 const { assignLead } = require("../services/leadAssignment.service");
+const {
+  ensureCourseGroupMembership,
+} = require("../services/group.service");
 
 
 const createPaymentOrder = async (req, res, next) => {
@@ -202,72 +205,94 @@ const verifyPayment = async (req, res, next) => {
         const session = await mongoose.startSession();
 
         try {
-        await session.withTransaction(async () => {
+          await session.withTransaction(async () => {
             const currentPayment = await PaymentHistory.findById(
-            payment._id
+              payment._id
             ).session(session);
 
             if (!currentPayment) {
-                throw new Error("Payment record not found");
-                }
+              throw new Error("Payment record not found");
+            }
 
-            if (
+            // Allow safe retry for an already captured payment
+            const isAlreadyCaptured =
               currentPayment.status === "captured" &&
-              currentPayment.razorpayPaymentId === razorpay_payment_id
-            ) {
-              return;
-            }
+              currentPayment.razorpayPaymentId === razorpay_payment_id;
 
-            if (currentPayment.status !== "created") {
-              throw new Error("Payment cannot be verified in its current status");
-            }
+            if (!isAlreadyCaptured) {
+              if (currentPayment.status !== "created") {
+                throw new Error(
+                  "Payment cannot be verified in its current status"
+                );
+              }
 
-            if (
+              if (
                 currentPayment.razorpayPaymentId &&
                 currentPayment.razorpayPaymentId !== razorpay_payment_id
-                ) {
+              ) {
                 throw new Error("Payment ID does not match this order");
+              }
+
+              currentPayment.razorpayPaymentId = razorpay_payment_id;
+              currentPayment.status = "captured";
+              currentPayment.paymentMethod = razorpayPayment.method;
+              currentPayment.verifiedAt = new Date();
+
+              await currentPayment.save({ session });
             }
 
-            currentPayment.razorpayPaymentId = razorpay_payment_id;
-            currentPayment.status = "captured";
-            currentPayment.paymentMethod = razorpayPayment.method;
-            currentPayment.verifiedAt = new Date();
-
-            await currentPayment.save({ session });
-
-            const existingEnrollment = await Enrollment.findOne({
-            student: currentPayment.student,
-            course: currentPayment.course,
+            // Find or create enrollment
+            let enrollment = await Enrollment.findOne({
+              student: currentPayment.student,
+              course: currentPayment.course,
             }).session(session);
 
-            let enrollment = existingEnrollment;
-
             if (!enrollment) {
-            [enrollment] = await Enrollment.create(
-                [{
-                student: currentPayment.student,
-                course: currentPayment.course,
-                }],
+              [enrollment] = await Enrollment.create(
+                [
+                  {
+                    student: currentPayment.student,
+                    course: currentPayment.course,
+                  },
+                ],
                 { session }
-            );
+              );
             }
 
+            // Create progress if it does not exist
             await Progress.updateOne(
-            {
+              {
                 student: currentPayment.student,
                 course: currentPayment.course,
-            },
-            {
+              },
+              {
                 $setOnInsert: {
-                student: currentPayment.student,
-                course: currentPayment.course,
+                  student: currentPayment.student,
+                  course: currentPayment.course,
                 },
-            },
-            { upsert: true, session }
+              },
+              { upsert: true, session }
             );
 
+            // Get course details
+            const course = await Course.findById(
+              currentPayment.course
+            ).session(session);
+
+            if (!course) {
+              throw new Error("Course not found");
+            }
+
+            // Automatically create group and join student
+            await ensureCourseGroupMembership({
+              course,
+              studentId: currentPayment.student,
+              session,
+            });
+
             currentPayment.enrollment = enrollment._id;
+
+            // Update lead status
             const lead = currentPayment.lead
               ? await Lead.findById(currentPayment.lead).session(session)
               : null;
@@ -286,7 +311,7 @@ const verifyPayment = async (req, res, next) => {
             }
 
             await currentPayment.save({ session });
-        });
+          });
         } finally {
         await session.endSession();
         }

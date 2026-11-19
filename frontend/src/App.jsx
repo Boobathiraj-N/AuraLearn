@@ -27,6 +27,7 @@ import CourseIntroduction from "./pages/student/CourseIntroduction";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ChangePassword from "./pages/ChangePassword";
+import GroupChat from "./pages/student/GroupChat";
 import "./App.css";
 
 function App() {
@@ -77,6 +78,12 @@ function App() {
           <Route
             path="/student/courses/:courseId/learn"
             element={<StudentLearning />}
+          />
+
+          {/* Group Chat */}
+          <Route
+            path="/student/groups/:groupId"
+            element={<GroupChat />}
           />
         </Route>
 

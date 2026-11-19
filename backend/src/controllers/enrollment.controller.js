@@ -8,6 +8,9 @@ const Module = require("../models/Module");
 const Lesson = require("../models/Lesson");
 
 const { assignLead } = require("../services/leadAssignment.service");
+const {
+  ensureCourseGroupMembership,
+} = require("../services/group.service");
 
 const enrollCourse = async (req, res, next) => {
   const session = await mongoose.startSession();
@@ -67,6 +70,14 @@ const enrollCourse = async (req, res, next) => {
         { session }
       );
 
+      // Automatically join student to course group
+      const { group, membership } =
+        await ensureCourseGroupMembership({
+          course,
+          studentId,
+          session,
+      });
+
       // Create CRM lead only for free courses
       if (course.price === 0) {
         const [lead] = await Lead.create(
@@ -89,11 +100,23 @@ const enrollCourse = async (req, res, next) => {
 
         result = {
           enrollment,
+          group: {
+            id: group._id,
+            name: group.name,
+          },
+          membershipId: membership._id,
           lead: assignment.lead,
           assignedStaff: assignment.assignment.assignedTo,
         };
       } else {
-        result = { enrollment };
+        result = {
+          enrollment,
+          group: {
+            id: group._id,
+            name: group.name,
+          },
+          membershipId: membership._id,
+        };
       }
     });
 

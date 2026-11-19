@@ -15,7 +15,7 @@ const leadNoteRoutes = require("./routes/leadNote.routes");
 const paymentRoutes = require("./routes/payment.routes");
 const courseRoutes = require("./routes/course.routes");
 const courseFeedbackRoutes = require("./routes/courseFeedback.routes");
-
+const groupRoutes = require("./routes/group.routes");
 
 
 const app = express();
@@ -36,6 +36,7 @@ app.use("/api/leads", leadNoteRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/course-feedback", courseFeedbackRoutes);
+app.use("/api/groups", groupRoutes);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({
@@ -50,6 +51,8 @@ app.use((req, res) => {
     message: "Route not found",
   });
 });
+
+
 
 
 app.use(errorHandler);

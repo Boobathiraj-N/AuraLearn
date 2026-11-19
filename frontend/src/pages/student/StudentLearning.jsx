@@ -1,6 +1,7 @@
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { getMyGroups } from "../../services/groupService";
 
 import { getEnrolledCourseContent } from "../../services/courseService";
 import {
@@ -10,6 +11,9 @@ import {
 
 const StudentLearning = () => {
   const { courseId } = useParams();
+const navigate = useNavigate();
+
+const [courseGroup, setCourseGroup] = useState(null);
 
   const [courseData, setCourseData] = useState(null);
   const [progress, setProgress] = useState(null);
@@ -54,6 +58,24 @@ const [completionError, setCompletionError] = useState("");
     };
 
     fetchLearningData();
+  }, [courseId]);
+
+  useEffect(() => {
+  const fetchCourseGroup = async () => {
+    try {
+      const response = await getMyGroups();
+
+      const matchedGroup = response.data.find(
+        (group) => group.course?._id === courseId
+      );
+
+      setCourseGroup(matchedGroup || null);
+    } catch (error) {
+      console.error("Failed to fetch course group:", error);
+    }
+  };
+
+  fetchCourseGroup();
   }, [courseId]);
 
   const toggleModule = (moduleId) => {
@@ -191,6 +213,17 @@ const [completionError, setCompletionError] = useState("");
               {courseData.course?.title || "My Learning"}
             </h1>
           </div>
+
+          {courseGroup && (
+            <button
+              onClick={() =>
+                navigate(`/student/groups/${courseGroup.groupId}`)
+              }
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+            >
+              Group Chat
+            </button>
+          )}
 
           <div className="hidden shrink-0 text-right sm:block">
             <p className="text-xs text-gray-400">Course progress</p>
