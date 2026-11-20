@@ -175,9 +175,10 @@ const sendGroupMessage = async (req, res, next) => {
       student: { $ne: req.user.id },
     }).select("student");
 
+    
     // Create persistent notifications
     if (members.length > 0) {
-      await GroupNotification.insertMany(
+      const notifications = await GroupNotification.insertMany(
         members.map((member) => ({
           recipient: member.student,
           group: groupId,
@@ -186,10 +187,36 @@ const sendGroupMessage = async (req, res, next) => {
           notificationType: "new_message",
         }))
       );
+
+      // Send real-time notification to each recipient
+      const io = req.app.get("io");
+
+      notifications.forEach((notification) => {
+        io.to(`user:${notification.recipient}`).emit(
+          "new-notification",
+          {
+            _id: notification._id,
+            group: groupId,
+            message: message._id,
+            sender: req.user.id,
+            notificationType: "new_message",
+            createdAt: notification.createdAt,
+          }
+        );
+      });
     }
+
 
     const populatedMessage = await GroupMessage.findById(message._id)
       .populate("sender", "name role");
+
+    // Broadcast message to all connected members in this group
+        const io = req.app.get("io");
+
+        io.to(`group:${groupId}`).emit(
+          "new-message",
+          populatedMessage
+        );
 
     return res.status(201).json({
       success: true,

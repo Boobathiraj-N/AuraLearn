@@ -1,4 +1,10 @@
 
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
+import {
+  connectSocket,
+  disconnectSocket,
+} from "./services/socketService";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import Register from "./pages/Register";
@@ -30,9 +36,27 @@ import ChangePassword from "./pages/ChangePassword";
 import GroupChat from "./pages/student/GroupChat";
 import "./App.css";
 
+function GlobalSocket() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const token = localStorage.getItem("authToken");
+
+    if (token) {
+      connectSocket(token);
+    } else {
+      disconnectSocket();
+    }
+  }, [location.pathname]);
+
+  return null;
+}
+
 function App() {
   return (
     <BrowserRouter>
+
+      <GlobalSocket />
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<Navigate to="/login" replace />} />

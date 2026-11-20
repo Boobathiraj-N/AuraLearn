@@ -6,6 +6,14 @@ import {
   getGroupMessages,
   sendGroupMessage,
 } from "../../services/groupService";
+import {
+  connectSocket,
+  disconnectSocket,
+  getSocket,
+} from "../../services/socketService";
+import { markGroupNotificationsAsRead } from "../../services/notificationService";
+
+
 
 function GroupChat() {
   const { groupId } = useParams();
@@ -43,6 +51,85 @@ function GroupChat() {
     });
   }, [messages]);
 
+  useEffect(() => {
+  const token = localStorage.getItem("authToken");
+
+  if (!token) return;
+
+  const socket = connectSocket(token);
+
+  const handleConnect = () => {
+    console.log("Socket connected:", socket.id);
+
+    socket.emit("join-group", { groupId }, (response) => {
+      if (response.success) {
+        console.log("Joined group successfully");
+      } else {
+        console.error("Group join failed:", response.message);
+      }
+    });
+  };
+
+  const handleConnectError = (error) => {
+    console.error("Socket connection error:", error.message);
+  };
+
+  socket.on("connect", handleConnect);
+  socket.on("connect_error", handleConnectError);
+
+  if (socket.connected) {
+    handleConnect();
+  }
+
+  return () => {
+    socket.off("connect", handleConnect);
+    socket.off("connect_error", handleConnectError);
+    disconnectSocket();
+  };
+  }, [groupId]);
+
+  useEffect(() => {
+    const socket = getSocket();
+
+    if (!socket) return;
+
+    const handleNewMessage = (newMessage) => {
+      // Prevent duplicate messages
+      setMessages((prevMessages) => {
+        const alreadyExists = prevMessages.some(
+          (message) => message._id === newMessage._id
+        );
+
+        if (alreadyExists) return prevMessages;
+
+        return [...prevMessages, newMessage];
+      });
+    };
+
+    socket.on("new-message", handleNewMessage);
+
+    return () => {
+      socket.off("new-message", handleNewMessage);
+    };
+  }, []);
+
+  useEffect(() => {
+  if (!groupId) return;
+
+  const markGroupAsRead = async () => {
+    try {
+      await markGroupNotificationsAsRead(groupId);
+    } catch (error) {
+      console.error(
+        "Failed to mark group notifications as read:",
+        error
+      );
+    }
+  };
+
+  markGroupAsRead();
+  }, [groupId]);
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
 
@@ -56,10 +143,15 @@ function GroupChat() {
         content.trim()
       );
 
-      setMessages((prev) => [
-        ...prev,
-        response.data,
-      ]);
+      setMessages((prevMessages) => {
+        const alreadyExists = prevMessages.some(
+          (message) => message._id === response.data._id
+        );
+
+        if (alreadyExists) return prevMessages;
+
+        return [...prevMessages, response.data];
+      });
 
       setContent("");
     } catch (error) {

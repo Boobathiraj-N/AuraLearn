@@ -1,5 +1,3 @@
-
-
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -8,6 +6,13 @@ import {
   enrollFreeCourse,
 } from "../../services/courseService";
 import { startRazorpayPayment } from "../../utils/razorpayPayment";
+import { getSocket, connectSocket } from "../../services/socketService";
+import {
+  getUnreadCount,
+  getMyNotifications,
+  markNotificationAsRead,
+} from "../../services/notificationService";
+
 
 const categories = [
   "All",
@@ -31,6 +36,10 @@ const CourseListing = () => {
   const [message, setMessage] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
   const [enrolledIds, setEnrolledIds] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationLoading, setNotificationLoading] = useState(false);
 
   const user = JSON.parse(localStorage.getItem("authUser") || "{}");
   const userName = user.name || "Student";
@@ -67,6 +76,37 @@ useEffect(() => {
   };
 
   fetchCourses();
+}, []);
+
+// REAL-TIME NOTIFICATION LISTENER
+useEffect(() => {
+  const token = localStorage.getItem("authToken");
+
+  if (!token) return;
+
+  const fetchUnreadCount = async () => {
+    try {
+      const result = await getUnreadCount();
+      setUnreadCount(result.unreadCount || 0);
+    } catch (error) {
+      console.error("Failed to fetch unread count:", error);
+    }
+  };
+
+  fetchUnreadCount();
+
+  // Ensure socket connection exists
+  const socket = connectSocket(token);
+
+  const handleNewNotification = () => {
+    setUnreadCount((prev) => prev + 1);
+  };
+
+  socket.on("new-notification", handleNewNotification);
+
+  return () => {
+    socket.off("new-notification", handleNewNotification);
+  };
 }, []);
 
 
@@ -139,6 +179,47 @@ useEffect(() => {
     }
   };
 
+  const handleNotificationClick = async () => {
+  const isOpening = !notificationOpen;
+  setNotificationOpen(isOpening);
+
+  if (!isOpening) return;
+
+  try {
+    setNotificationLoading(true);
+
+    const result = await getMyNotifications();
+    setNotifications(result.data || []);
+  } catch (error) {
+    console.error("Failed to load notifications:", error);
+  } finally {
+    setNotificationLoading(false);
+  }
+  };
+
+  const handleOpenNotification = async (notification) => {
+    try {
+      if (!notification.isRead) {
+        await markNotificationAsRead(notification._id);
+
+        setNotifications((prev) =>
+          prev.map((item) =>
+            item._id === notification._id
+              ? { ...item, isRead: true }
+              : item
+          )
+        );
+
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      }
+
+      setNotificationOpen(false);
+
+      navigate(`/student/groups/${notification.group._id}`);
+    } catch (error) {
+      console.error("Failed to open notification:", error);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("authToken");
@@ -248,56 +329,136 @@ useEffect(() => {
               />
             </div>
 
-            {/* Profile Dropdown */}
-            <div className="relative ml-auto">
-              <button
-                onClick={() => setProfileOpen((prev) => !prev)}
-                className="flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-white/5"
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 font-bold">
-                  {avatarLetter}
-                </div>
+            <div className="ml-auto flex items-center gap-3">
 
-                <div className="hidden text-left sm:block">
-                  <p className="text-sm font-semibold">{userName}</p>
-                  <p className="text-xs text-gray-500">Student</p>
-                </div>
+              {/* Notification Bell */}
+              <div className="relative">
+                <button
+                  onClick={handleNotificationClick}
+                  className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-[#18181b] text-xl transition hover:bg-white/10"
+                >
+                  🔔
 
-                <span className="text-xs text-gray-400">⌄</span>
-              </button>
+                  {unreadCount > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                </button>
 
-              {profileOpen && (
-                <div className="absolute right-0 top-14 w-52 overflow-hidden rounded-xl border border-white/10 bg-[#18181b] p-2 shadow-2xl">
-                  <button
-                    onClick={() => {
-                      setProfileOpen(false);
-                      navigate("/student/progress");
-                    }}
-                    className="w-full rounded-lg px-3 py-2.5 text-left text-sm text-gray-300 hover:bg-white/5"
-                  >
-                    My Progress
-                  </button>
+                {/* Notification Dropdown */}
+                {notificationOpen && (
+                  <div className="absolute right-0 top-14 z-50 w-80 overflow-hidden rounded-xl border border-white/10 bg-[#18181b] shadow-2xl sm:w-96">
 
-                  <button
-                    onClick={() => {
-                      setProfileOpen(false);
-                      navigate("/change-password");
-                    }}
-                    className="w-full rounded-lg px-3 py-2.5 text-left text-sm text-gray-300 hover:bg-white/5"
-                  >
-                    Change Password
-                  </button>
+                    <div className="border-b border-white/10 px-4 py-3">
+                      <h3 className="font-semibold text-white">
+                        Notifications
+                      </h3>
+                      <p className="mt-1 text-xs text-gray-400">
+                        {unreadCount} unread messages
+                      </p>
+                    </div>
 
-                  <div className="my-2 border-t border-white/10" />
+                    <div className="max-h-96 overflow-y-auto">
+                      {notificationLoading ? (
+                        <p className="p-5 text-center text-sm text-gray-400">
+                          Loading notifications...
+                        </p>
+                      ) : notifications.length === 0 ? (
+                        <p className="p-5 text-center text-sm text-gray-400">
+                          No notifications yet.
+                        </p>
+                      ) : (
+                        notifications.map((notification) => (
+                          <button
+                            key={notification._id}
+                            onClick={() => handleOpenNotification(notification)}
+                            className={`w-full border-b border-white/5 px-4 py-3 text-left transition hover:bg-white/5 ${
+                              !notification.isRead ? "bg-violet-500/10" : ""
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-violet-300">
+                                {notification.sender?.name?.charAt(0) || "U"}
+                              </div>
 
-                  <button
-                    onClick={handleLogout}
-                    className="w-full rounded-lg px-3 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold text-white">
+                                  {notification.sender?.name || "Student"}
+                                </p>
+
+                                <p className="mt-1 truncate text-xs text-gray-400">
+                                  {notification.message?.content || "Sent an image"}
+                                </p>
+
+                                <p className="mt-1 text-xs text-violet-400">
+                                  {notification.group?.name || "Course Group"}
+                                </p>
+                              </div>
+
+                              {!notification.isRead && (
+                                <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-violet-400" />
+                              )}
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Profile Dropdown */}
+              <div className="relative ml-auto">
+                <button
+                  onClick={() => setProfileOpen((prev) => !prev)}
+                  className="flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-white/5"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 font-bold">
+                    {avatarLetter}
+                  </div>
+
+                  <div className="hidden text-left sm:block">
+                    <p className="text-sm font-semibold">{userName}</p>
+                    <p className="text-xs text-gray-500">Student</p>
+                  </div>
+
+                  <span className="text-xs text-gray-400">⌄</span>
+                </button>
+
+                {profileOpen && (
+                  <div className="absolute right-0 top-14 w-52 overflow-hidden rounded-xl border border-white/10 bg-[#18181b] p-2 shadow-2xl">
+                    <button
+                      onClick={() => {
+                        setProfileOpen(false);
+                        navigate("/student/progress");
+                      }}
+                      className="w-full rounded-lg px-3 py-2.5 text-left text-sm text-gray-300 hover:bg-white/5"
+                    >
+                      My Progress
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setProfileOpen(false);
+                        navigate("/change-password");
+                      }}
+                      className="w-full rounded-lg px-3 py-2.5 text-left text-sm text-gray-300 hover:bg-white/5"
+                    >
+                      Change Password
+                    </button>
+
+                    <div className="my-2 border-t border-white/10" />
+
+                    <button
+                      onClick={handleLogout}
+                      className="w-full rounded-lg px-3 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
