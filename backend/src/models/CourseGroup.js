@@ -21,6 +21,12 @@ const courseGroupSchema = new mongoose.Schema(
       default: "",
     },
 
+    assignedSupport: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
     isActive: {
       type: Boolean,
       default: true,
@@ -40,6 +46,7 @@ const courseGroupSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
   },
   { timestamps: true }
 );

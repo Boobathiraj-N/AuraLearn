@@ -275,9 +275,17 @@ function GroupChat() {
                     }`}
                   >
                     {!isOwnMessage && (
-                      <p className="mb-1 text-xs font-semibold text-indigo-600">
-                        {message.sender?.name || "User"}
-                      </p>
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="text-xs font-semibold text-indigo-600">
+                          {message.sender?.name || "User"}
+                        </span>
+
+                        {message.sender?.role === "support" && (
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                            🎧 Tech Support
+                          </span>
+                        )}
+                      </div>
                     )}
 
                     {message.messageType === "image" ? (

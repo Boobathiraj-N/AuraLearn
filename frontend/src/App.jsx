@@ -34,6 +34,9 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ChangePassword from "./pages/ChangePassword";
 import GroupChat from "./pages/student/GroupChat";
+import SupportGroups from "./pages/staff/SupportGroups";
+import SupportGroupChat from "./pages/staff/SupportGroupChat";
+
 import "./App.css";
 
 function GlobalSocket() {
@@ -138,6 +141,8 @@ function App() {
             <Route index element={<StaffDashboard />} />
             <Route path="leads" element={<LeadManagement />} />
             <Route path="leads/:leadId" element={<LeadDetails />} />
+            <Route path="groups" element={<SupportGroups />} />
+            <Route path="groups/:groupId" element={<SupportGroupChat />} />
           </Route>
         </Route>
 

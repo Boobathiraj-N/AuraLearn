@@ -78,13 +78,6 @@ io.on("connection", (socket) => {
   // Join course group room
   socket.on("join-group", async ({ groupId }, callback) => {
     try {
-      if (socket.user.role !== "student") {
-        return callback?.({
-          success: false,
-          message: "Only students can join group rooms",
-        });
-      }
-
       if (!mongoose.Types.ObjectId.isValid(groupId)) {
         return callback?.({
           success: false,
@@ -105,17 +98,29 @@ io.on("connection", (socket) => {
         });
       }
 
-      // Check student membership
-      const membership = await GroupMembership.findOne({
-        group: groupId,
-        student: socket.user.id,
-        isActive: true,
-      });
+      let hasAccess = false;
 
-      if (!membership) {
+      // Student authorization
+      if (socket.user.role === "student") {
+        const membership = await GroupMembership.findOne({
+          group: groupId,
+          student: socket.user.id,
+          isActive: true,
+        });
+
+        hasAccess = !!membership;
+      }
+
+      // Support authorization
+      else if (socket.user.role === "support") {
+        hasAccess =
+          group.assignedSupport?.toString() === socket.user.id;
+      }
+
+      if (!hasAccess) {
         return callback?.({
           success: false,
-          message: "You are not a member of this group",
+          message: "You don't have access to this group",
         });
       }
 

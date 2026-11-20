@@ -11,7 +11,7 @@ const getMyNotifications = async (req, res, next) => {
     const notifications = await GroupNotification.find({
       recipient: req.user.id,
     })
-      .populate("sender", "name")
+      .populate("sender", "name role")
       .populate("group", "name")
       .populate("message", "content messageType createdAt")
       .sort({ createdAt: -1 })
@@ -168,3 +168,5 @@ module.exports = {
   markAllNotificationsAsRead,
   markGroupNotificationsAsRead,
 };
+
+

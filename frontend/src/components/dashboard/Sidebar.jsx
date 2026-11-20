@@ -11,6 +11,7 @@ import {
   X,
   ClipboardList,
   Layers,
+  MessageCircle,
 } from "lucide-react";
 
 const adminMenuItems = [
@@ -33,6 +34,15 @@ const staffMenuItems = (role) => [
     path: `/${role}/leads`,
     icon: ClipboardList,
   },
+  ...(role === "support"
+    ? [
+        {
+          label: "Groups",
+          path: "/support/groups",
+          icon: MessageCircle,
+        },
+      ]
+    : []),
 ];
 
 function Sidebar({ open, onClose }) {

@@ -383,9 +383,17 @@ useEffect(() => {
                               </div>
 
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm font-semibold text-white">
-                                  {notification.sender?.name || "Student"}
-                                </p>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="text-sm font-semibold text-white">
+                                    {notification.sender?.name || "Student"}
+                                  </p>
+
+                                  {notification.sender?.role === "support" && (
+                                    <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] font-semibold text-blue-300">
+                                      🎧 Tech Support
+                                    </span>
+                                  )}
+                                </div>
 
                                 <p className="mt-1 truncate text-xs text-gray-400">
                                   {notification.message?.content || "Sent an image"}

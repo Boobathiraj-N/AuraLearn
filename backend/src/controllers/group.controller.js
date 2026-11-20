@@ -43,6 +43,35 @@ const getMyGroups = async (req, res, next) => {
   }
 };
 
+const getMySupportGroups = async (req, res, next) => {
+  try {
+    const groups = await CourseGroup.find({
+      assignedSupport: req.user.id,
+      isActive: true,
+    })
+      .populate("course", "title thumbnail")
+      .sort({ lastMessageAt: -1, updatedAt: -1 })
+      .lean();
+
+    const formattedGroups = groups.map((group) => ({
+      groupId: group._id,
+      groupName: group.name,
+      course: group.course,
+      memberCount: group.memberCount,
+      lastMessage: group.lastMessage,
+      lastMessageAt: group.lastMessageAt,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      count: formattedGroups.length,
+      data: formattedGroups,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 const GroupMessage = require("../models/GroupMessage");
 
@@ -56,17 +85,31 @@ const getGroupMessages = async (req, res, next) => {
       Math.max(1, Number(req.query.limit) || 20)
     );
 
-    // Check group membership
-    const membership = await GroupMembership.findOne({
-      group: groupId,
-      student: req.user.id,
-      isActive: true,
-    });
+    // Check access based on user role
+    let hasAccess = false;
 
-    if (!membership) {
+    if (req.user.role === "student") {
+      const membership = await GroupMembership.findOne({
+        group: groupId,
+        student: req.user.id,
+        isActive: true,
+      });
+
+      hasAccess = !!membership;
+    } else if (req.user.role === "support") {
+      const group = await CourseGroup.findOne({
+        _id: groupId,
+        assignedSupport: req.user.id,
+        isActive: true,
+      });
+
+      hasAccess = !!group;
+    }
+
+    if (!hasAccess) {
       return res.status(403).json({
         success: false,
-        message: "You are not a member of this group",
+        message: "You don't have access to this group",
       });
     }
 
@@ -127,19 +170,35 @@ const sendGroupMessage = async (req, res, next) => {
       });
     }
 
-    // Check student membership
-    const membership = await GroupMembership.findOne({
-      group: groupId,
-      student: req.user.id,
-      isActive: true,
-    });
+      // Check access based on user role
+      let hasAccess = false;
 
-    if (!membership) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not a member of this group",
-      });
-    }
+      if (req.user.role === "student") {
+        const membership = await GroupMembership.findOne({
+          group: groupId,
+          student: req.user.id,
+          isActive: true,
+        });
+
+        hasAccess = !!membership;
+      } else if (req.user.role === "support") {
+        const group = await CourseGroup.findOne({
+          _id: groupId,
+          assignedSupport: req.user.id,
+          isActive: true,
+        });
+
+        hasAccess = !!group;
+      }
+
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: "You don't have access to this group",
+        });
+      }
+
+      const io = req.app.get("io");
 
     // Check group availability
     const group = await CourseGroup.findOne({
@@ -168,49 +227,63 @@ const sendGroupMessage = async (req, res, next) => {
 
     await group.save();
 
-    // Find other active group members
-    const members = await GroupMembership.find({
-      group: groupId,
-      isActive: true,
-      student: { $ne: req.user.id },
-    }).select("student");
+      // Find other active group members
+      const members = await GroupMembership.find({
+        group: groupId,
+        isActive: true,
+        student: { $ne: req.user.id },
+      }).select("student");
 
-    
-    // Create persistent notifications
-    if (members.length > 0) {
-      const notifications = await GroupNotification.insertMany(
-        members.map((member) => ({
-          recipient: member.student,
-          group: groupId,
-          message: message._id,
-          sender: req.user.id,
-          notificationType: "new_message",
-        }))
+      // Prepare notification recipients
+      const recipientIds = members.map((member) =>
+        member.student.toString()
       );
 
-      // Send real-time notification to each recipient
-      const io = req.app.get("io");
+      // Notify assigned support when a student sends a message
+      if (
+        req.user.role === "student" &&
+        group.assignedSupport
+      ) {
+        recipientIds.push(group.assignedSupport.toString());
+      }
 
-      notifications.forEach((notification) => {
-        io.to(`user:${notification.recipient}`).emit(
-          "new-notification",
-          {
-            _id: notification._id,
+      // Remove duplicate recipients
+      const uniqueRecipients = [...new Set(recipientIds)];
+
+      
+      // Create persistent notifications
+      if (uniqueRecipients.length > 0) {
+        const notifications = await GroupNotification.insertMany(
+          uniqueRecipients.map((recipientId) => ({
+            recipient: recipientId,
             group: groupId,
             message: message._id,
             sender: req.user.id,
             notificationType: "new_message",
-            createdAt: notification.createdAt,
-          }
+          }))
         );
-      });
-    }
+
+        
+
+        notifications.forEach((notification) => {
+          io.to(`user:${notification.recipient}`).emit(
+            "new-notification",
+            {
+              _id: notification._id,
+              group: groupId,
+              message: message._id,
+              sender: req.user.id,
+              notificationType: "new_message",
+              createdAt: notification.createdAt,
+            }
+          );
+        });
+      }
 
 
     const populatedMessage = await GroupMessage.findById(message._id)
       .populate("sender", "name role");
 
-    const io = req.app.get("io");
 
     io.to(`group:${groupId}`).emit("new-message", populatedMessage);
 
@@ -242,16 +315,30 @@ const uploadGroupImage = async (req, res, next) => {
       });
     }
 
-    const membership = await GroupMembership.findOne({
-      group: groupId,
-      student: req.user.id,
-      isActive: true,
-    });
+    let hasAccess = false;
 
-    if (!membership) {
+    if (req.user.role === "student") {
+      const membership = await GroupMembership.findOne({
+        group: groupId,
+        student: req.user.id,
+        isActive: true,
+      });
+
+      hasAccess = !!membership;
+    } else if (req.user.role === "support") {
+      const group = await CourseGroup.findOne({
+        _id: groupId,
+        assignedSupport: req.user.id,
+        isActive: true,
+      });
+
+      hasAccess = !!group;
+    }
+
+    if (!hasAccess) {
       return res.status(403).json({
         success: false,
-        message: "You are not a member of this group",
+        message: "You don't have access to this group",
       });
     }
 
@@ -285,6 +372,7 @@ const uploadGroupImage = async (req, res, next) => {
     group.lastMessageAt = message.createdAt;
     await group.save();
 
+
     // Find other active group members
     const members = await GroupMembership.find({
       group: groupId,
@@ -294,11 +382,24 @@ const uploadGroupImage = async (req, res, next) => {
 
     const io = req.app.get("io");
 
-    // Create notifications for other members
-    if (members.length > 0) {
+    // Prepare notification recipients
+    const recipientIds = members.map((member) =>
+      member.student.toString()
+    );
+
+    // Notify assigned support when a student sends an image
+    if (req.user.role === "student" && group.assignedSupport) {
+      recipientIds.push(group.assignedSupport.toString());
+    }
+
+    // Remove duplicate recipients
+    const uniqueRecipients = [...new Set(recipientIds)];
+
+    // Create persistent notifications
+    if (uniqueRecipients.length > 0) {
       const notifications = await GroupNotification.insertMany(
-        members.map((member) => ({
-          recipient: member.student,
+        uniqueRecipients.map((recipientId) => ({
+          recipient: recipientId,
           group: groupId,
           message: message._id,
           sender: req.user.id,
@@ -306,7 +407,6 @@ const uploadGroupImage = async (req, res, next) => {
         }))
       );
 
-      // Emit real-time notifications
       notifications.forEach((notification) => {
         io.to(`user:${notification.recipient}`).emit(
           "new-notification",
@@ -337,10 +437,76 @@ const uploadGroupImage = async (req, res, next) => {
   }
 };
 
+const assignSupportToGroup = async (req, res, next) => {
+  try {
+    const { groupId } = req.params;
+    const { supportId } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(groupId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid group ID",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(supportId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid support ID",
+      });
+    }
+
+    // Check whether the selected user is an active support staff
+    const supportUser = await mongoose
+      .model("User")
+      .findOne({
+        _id: supportId,
+        role: "support",
+        isActive: true,
+      });
+
+    if (!supportUser) {
+      return res.status(404).json({
+        success: false,
+        message: "Active support staff not found",
+      });
+    }
+
+    const group = await CourseGroup.findOneAndUpdate(
+      {
+        _id: groupId,
+        isActive: true,
+      },
+      {
+        $set: { assignedSupport: supportId },
+      },
+      {
+        new: true,
+      }
+    ).populate("assignedSupport", "name email");
+
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: "Group not found or inactive",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Support staff assigned successfully",
+      data: group,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 module.exports = {
   getMyGroups,
+  getMySupportGroups,
   getGroupMessages,
   sendGroupMessage,
   uploadGroupImage,
+  assignSupportToGroup,
 };

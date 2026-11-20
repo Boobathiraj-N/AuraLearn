@@ -23,6 +23,12 @@ export const getMyGroups = async () => {
   return response.data;
 };
 
+// GET SUPPORT STAFF'S ASSIGNED GROUPS
+export const getMySupportGroups = async () => {
+  const response = await groupApi.get("/groups/my-support-groups");
+  return response.data;
+};
+
 // GET GROUP MESSAGES
 export const getGroupMessages = async (groupId, page = 1, limit = 20) => {
   const response = await groupApi.get(
