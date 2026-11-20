@@ -212,32 +212,6 @@ const sendGroupMessage = async (req, res, next) => {
 
     const io = req.app.get("io");
 
-    if (members.length > 0) {
-      const notifications = await GroupNotification.insertMany(
-        members.map((member) => ({
-          recipient: member.student,
-          group: groupId,
-          message: message._id,
-          sender: req.user.id,
-          notificationType: "new_message",
-        }))
-      );
-
-      notifications.forEach((notification) => {
-        io.to(`user:${notification.recipient}`).emit(
-          "new-notification",
-          {
-            _id: notification._id,
-            group: groupId,
-            message: message._id,
-            sender: req.user.id,
-            notificationType: "new_message",
-            createdAt: notification.createdAt,
-          }
-        );
-      });
-    }
-
     io.to(`group:${groupId}`).emit("new-message", populatedMessage);
 
     return res.status(201).json({
@@ -311,13 +285,48 @@ const uploadGroupImage = async (req, res, next) => {
     group.lastMessageAt = message.createdAt;
     await group.save();
 
-    const populatedMessage = await GroupMessage.findById(message._id)
-      .populate("sender", "name role");
+    // Find other active group members
+    const members = await GroupMembership.find({
+      group: groupId,
+      isActive: true,
+      student: { $ne: req.user.id },
+    }).select("student");
 
     const io = req.app.get("io");
 
-    io.to(`group:${groupId}`).emit("new-message", populatedMessage);
+    // Create notifications for other members
+    if (members.length > 0) {
+      const notifications = await GroupNotification.insertMany(
+        members.map((member) => ({
+          recipient: member.student,
+          group: groupId,
+          message: message._id,
+          sender: req.user.id,
+          notificationType: "new_message",
+        }))
+      );
 
+      // Emit real-time notifications
+      notifications.forEach((notification) => {
+        io.to(`user:${notification.recipient}`).emit(
+          "new-notification",
+          {
+            _id: notification._id,
+            group: groupId,
+            message: message._id,
+            sender: req.user.id,
+            notificationType: "new_message",
+            createdAt: notification.createdAt,
+          }
+        );
+      });
+    }
+
+    const populatedMessage = await GroupMessage.findById(message._id)
+      .populate("sender", "name role");
+
+    // Broadcast image to group members
+    io.to(`group:${groupId}`).emit("new-message", populatedMessage);
     return res.status(201).json({
       success: true,
       message: "Image uploaded successfully",

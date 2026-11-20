@@ -158,44 +158,44 @@ function GroupChat() {
     e.target.value = "";
   };
 
-  const handleSendImage = async () => {
-  if (!selectedImage || uploadingImage) return;
-
-  try {
-    setUploadingImage(true);
-
-    const response = await sendGroupImage(
-      groupId,
-      selectedImage
-    );
-
-    setMessages((prevMessages) => {
-      const alreadyExists = prevMessages.some(
-        (message) => message._id === response.data._id
-      );
-
-      if (alreadyExists) return prevMessages;
-
-      return [...prevMessages, response.data];
-    });
-
-    URL.revokeObjectURL(imagePreview);
-    setSelectedImage(null);
-    setImagePreview("");
-  } catch (error) {
-    console.error("Image upload failed:", error);
-
-    alert(
-      error.response?.data?.message || "Image upload failed"
-    );
-  } finally {
-    setUploadingImage(false);
-  }
-  };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
 
+    // If an image is selected, upload the image
+    if (selectedImage) {
+      if (uploadingImage) return;
+
+      try {
+        setUploadingImage(true);
+
+        const response = await sendGroupImage(
+          groupId,
+          selectedImage
+        );
+
+        setMessages((prevMessages) => {
+          const exists = prevMessages.some(
+            (message) => message._id === response.data._id
+          );
+
+          return exists ? prevMessages : [...prevMessages, response.data];
+        });
+
+        URL.revokeObjectURL(imagePreview);
+        setSelectedImage(null);
+        setImagePreview("");
+      } catch (error) {
+        console.error("Image upload failed:", error);
+        alert(error.response?.data?.message || "Image upload failed");
+      } finally {
+        setUploadingImage(false);
+      }
+
+      return;
+    }
+
+    // Otherwise, send text message
     if (!content.trim() || sending) return;
 
     try {
@@ -207,21 +207,17 @@ function GroupChat() {
       );
 
       setMessages((prevMessages) => {
-        const alreadyExists = prevMessages.some(
+        const exists = prevMessages.some(
           (message) => message._id === response.data._id
         );
 
-        if (alreadyExists) return prevMessages;
-
-        return [...prevMessages, response.data];
+        return exists ? prevMessages : [...prevMessages, response.data];
       });
 
       setContent("");
     } catch (error) {
       console.error("Failed to send message:", error);
-      alert(
-        error.response?.data?.message || "Message sending failed"
-      );
+      alert(error.response?.data?.message || "Message sending failed");
     } finally {
       setSending(false);
     }
@@ -337,14 +333,6 @@ function GroupChat() {
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={handleSendImage}
-            disabled={uploadingImage}
-            className="mt-3 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {uploadingImage ? "Uploading..." : "Send Image"}
-          </button>
         </div>
       )}
 
@@ -379,7 +367,11 @@ function GroupChat() {
 
         <button
           type="submit"
-          disabled={!content.trim() || sending}
+          disabled={
+            (!content.trim() && !selectedImage) ||
+            sending ||
+            uploadingImage
+          }
           className="rounded-full bg-indigo-600 p-3 text-white transition hover:bg-indigo-700 disabled:opacity-50"
         >
           <Send size={18} />
