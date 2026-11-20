@@ -210,13 +210,35 @@ const sendGroupMessage = async (req, res, next) => {
     const populatedMessage = await GroupMessage.findById(message._id)
       .populate("sender", "name role");
 
-    // Broadcast message to all connected members in this group
-        const io = req.app.get("io");
+    const io = req.app.get("io");
 
-        io.to(`group:${groupId}`).emit(
-          "new-message",
-          populatedMessage
+    if (members.length > 0) {
+      const notifications = await GroupNotification.insertMany(
+        members.map((member) => ({
+          recipient: member.student,
+          group: groupId,
+          message: message._id,
+          sender: req.user.id,
+          notificationType: "new_message",
+        }))
+      );
+
+      notifications.forEach((notification) => {
+        io.to(`user:${notification.recipient}`).emit(
+          "new-notification",
+          {
+            _id: notification._id,
+            group: groupId,
+            message: message._id,
+            sender: req.user.id,
+            notificationType: "new_message",
+            createdAt: notification.createdAt,
+          }
         );
+      });
+    }
+
+    io.to(`group:${groupId}`).emit("new-message", populatedMessage);
 
     return res.status(201).json({
       success: true,
@@ -228,10 +250,88 @@ const sendGroupMessage = async (req, res, next) => {
   }
 };
 
+const uploadGroupImage = async (req, res, next) => {
+  try {
+    const { groupId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(groupId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid group ID",
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Please select an image",
+      });
+    }
+
+    const membership = await GroupMembership.findOne({
+      group: groupId,
+      student: req.user.id,
+      isActive: true,
+    });
+
+    if (!membership) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not a member of this group",
+      });
+    }
+
+    const group = await CourseGroup.findOne({
+      _id: groupId,
+      isActive: true,
+    });
+
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: "Group not found or inactive",
+      });
+    }
+
+    const uploadToCloudinary = require("../utils/uploadToCloudinary");
+
+    const uploadedImage = await uploadToCloudinary(req.file.buffer);
+
+    const message = await GroupMessage.create({
+      group: groupId,
+      sender: req.user.id,
+      messageType: "image",
+      image: {
+        url: uploadedImage.url,
+        publicId: uploadedImage.publicId,
+      },
+    });
+
+    group.lastMessage = "📷 Image";
+    group.lastMessageAt = message.createdAt;
+    await group.save();
+
+    const populatedMessage = await GroupMessage.findById(message._id)
+      .populate("sender", "name role");
+
+    const io = req.app.get("io");
+
+    io.to(`group:${groupId}`).emit("new-message", populatedMessage);
+
+    return res.status(201).json({
+      success: true,
+      message: "Image uploaded successfully",
+      data: populatedMessage,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 
 module.exports = {
   getMyGroups,
   getGroupMessages,
   sendGroupMessage,
+  uploadGroupImage,
 };

@@ -1,10 +1,11 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft, Send, Image, X } from "lucide-react";
 import {
   getGroupMessages,
   sendGroupMessage,
+  sendGroupImage,
 } from "../../services/groupService";
 import {
   connectSocket,
@@ -23,6 +24,11 @@ function GroupChat() {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const imageInputRef = useRef(null);
 
   const messagesEndRef = useRef(null);
 
@@ -130,6 +136,63 @@ function GroupChat() {
   markGroupAsRead();
   }, [groupId]);
 
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Please select a valid image");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image size must be less than 5 MB");
+      return;
+    }
+
+    setSelectedImage(file);
+    setImagePreview(URL.createObjectURL(file));
+
+    // Allow selecting the same image again
+    e.target.value = "";
+  };
+
+  const handleSendImage = async () => {
+  if (!selectedImage || uploadingImage) return;
+
+  try {
+    setUploadingImage(true);
+
+    const response = await sendGroupImage(
+      groupId,
+      selectedImage
+    );
+
+    setMessages((prevMessages) => {
+      const alreadyExists = prevMessages.some(
+        (message) => message._id === response.data._id
+      );
+
+      if (alreadyExists) return prevMessages;
+
+      return [...prevMessages, response.data];
+    });
+
+    URL.revokeObjectURL(imagePreview);
+    setSelectedImage(null);
+    setImagePreview("");
+  } catch (error) {
+    console.error("Image upload failed:", error);
+
+    alert(
+      error.response?.data?.message || "Image upload failed"
+    );
+  } finally {
+    setUploadingImage(false);
+  }
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
 
@@ -221,9 +284,17 @@ function GroupChat() {
                       </p>
                     )}
 
-                    <p className="break-words text-sm text-gray-800">
-                      {message.content}
-                    </p>
+                    {message.messageType === "image" ? (
+                      <img
+                        src={message.image?.url}
+                        alt="Shared image"
+                        className="max-h-72 w-full rounded-lg object-contain"
+                      />
+                    ) : (
+                      <p className="break-words text-sm text-gray-800">
+                        {message.content}
+                      </p>
+                    )}
 
                     <p className="mt-1 text-right text-[10px] text-gray-500">
                       {new Date(
@@ -243,11 +314,60 @@ function GroupChat() {
         </div>
       </main>
 
+      {/* Image Preview */}
+      {imagePreview && (
+        <div className="border-t bg-white px-4 py-3">
+          <div className="relative w-fit">
+            <img
+              src={imagePreview}
+              alt="Selected preview"
+              className="h-24 w-24 rounded-lg border object-cover"
+            />
+
+            <button
+              type="button"
+              onClick={() => {
+                URL.revokeObjectURL(imagePreview);
+                setSelectedImage(null);
+                setImagePreview("");
+              }}
+              className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white"
+            >
+              <X size={14} />
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleSendImage}
+            disabled={uploadingImage}
+            className="mt-3 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {uploadingImage ? "Uploading..." : "Send Image"}
+          </button>
+        </div>
+      )}
+
       {/* Message Input */}
       <form
         onSubmit={handleSendMessage}
         className="flex items-center gap-3 border-t bg-white px-4 py-3"
       >
+        <input
+          type="file"
+          accept="image/*"
+          ref={imageInputRef}
+          onChange={handleImageSelect}
+          className="hidden"
+        />
+
+        <button
+          type="button"
+          onClick={() => imageInputRef.current?.click()}
+          className="rounded-full p-3 text-gray-600 hover:bg-gray-100"
+        >
+          <Image size={20} />
+        </button>
         <input
           type="text"
           value={content}

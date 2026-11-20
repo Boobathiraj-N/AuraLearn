@@ -45,4 +45,18 @@ export const sendGroupMessage = async (groupId, content) => {
   return response.data;
 };
 
+// SEND IMAGE MESSAGE
+export const sendGroupImage = async (groupId, imageFile) => {
+  const formData = new FormData();
+
+  formData.append("image", imageFile);
+
+  const response = await groupApi.post(
+    `/groups/${groupId}/images`,
+    formData
+  );
+
+  return response.data;
+};
+
 export default groupApi;
