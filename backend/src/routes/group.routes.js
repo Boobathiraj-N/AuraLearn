@@ -9,6 +9,8 @@ const {
   sendGroupMessage,
   uploadGroupImage,
   assignSupportToGroup,
+  getAllGroups,
+  getActiveSupportStaff,
 } = require("../controllers/group.controller");
 
 const protect = require("../middleware/auth.middleware");
@@ -48,6 +50,20 @@ router.post(
   protect,
   upload.single("image"),
   uploadGroupImage
+);
+
+router.get(
+  "/admin/all-groups",
+  protect,
+  authorizeRole("admin"),
+  getAllGroups
+);
+
+router.get(
+  "/admin/support-staff",
+  protect,
+  authorizeRole("admin"),
+  getActiveSupportStaff
 );
 
 // Admin assigns support staff to a course group

@@ -3,7 +3,7 @@ const CourseGroup = require("../models/CourseGroup");
 const GroupMembership = require("../models/GroupMembership");
 const mongoose = require("mongoose");
 const GroupNotification = require("../models/GroupNotification");
-
+const User = require("../models/User");
 
 const getMyGroups = async (req, res, next) => {
   try {
@@ -239,12 +239,16 @@ const sendGroupMessage = async (req, res, next) => {
         member.student.toString()
       );
 
-      // Notify assigned support when a student sends a message
+      // Notify all assigned support staff when a student sends a message
       if (
         req.user.role === "student" &&
-        group.assignedSupport
+        group.assignedSupport?.length > 0
       ) {
-        recipientIds.push(group.assignedSupport.toString());
+        recipientIds.push(
+          ...group.assignedSupport.map((supportId) =>
+            supportId.toString()
+          )
+        );
       }
 
       // Remove duplicate recipients
@@ -412,9 +416,16 @@ const uploadGroupImage = async (req, res, next) => {
       member.student.toString()
     );
 
-    // Notify assigned support when a student sends an image
-    if (req.user.role === "student" && group.assignedSupport) {
-      recipientIds.push(group.assignedSupport.toString());
+    // Notify all assigned support staff when a student sends an image
+    if (
+      req.user.role === "student" &&
+      group.assignedSupport?.length > 0
+    ) {
+      recipientIds.push(
+        ...group.assignedSupport.map((supportId) =>
+          supportId.toString()
+        )
+      );
     }
 
     // Remove duplicate recipients
@@ -466,10 +477,50 @@ const uploadGroupImage = async (req, res, next) => {
   }
 };
 
+const getAllGroups = async (req, res, next) => {
+  try {
+    const groups = await CourseGroup.find({ isActive: true })
+      .populate("course", "title thumbnail")
+      .populate("assignedSupport", "name email")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      count: groups.length,
+      data: groups,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getActiveSupportStaff = async (req, res, next) => {
+  try {
+    const supportStaff = await User.find({
+      role: "support",
+      isActive: true,
+    })
+      .select("name email")
+      .sort({ name: 1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      count: supportStaff.length,
+      data: supportStaff,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
 const assignSupportToGroup = async (req, res, next) => {
   try {
     const { groupId } = req.params;
-    const { supportId } = req.body;
+    const { supportIds } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(groupId)) {
       return res.status(400).json({
@@ -478,26 +529,44 @@ const assignSupportToGroup = async (req, res, next) => {
       });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(supportId)) {
+    if (
+      !Array.isArray(supportIds) ||
+      supportIds.length === 0
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid support ID",
+        message: "Please select at least one support staff",
       });
     }
 
-    // Check whether the selected user is an active support staff
-    const supportUser = await mongoose
-      .model("User")
-      .findOne({
-        _id: supportId,
-        role: "support",
-        isActive: true,
-      });
+    // Validate support IDs
+    const invalidIds = supportIds.some(
+      (id) => !mongoose.Types.ObjectId.isValid(id)
+    );
 
-    if (!supportUser) {
+    if (invalidIds) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid support staff ID",
+      });
+    }
+
+    // Remove duplicate IDs
+    const uniqueSupportIds = [
+      ...new Set(supportIds.map((id) => id.toString())),
+    ];
+
+    // Check all selected users are active support staff
+    const supportUsers = await mongoose.model("User").find({
+      _id: { $in: uniqueSupportIds },
+      role: "support",
+      isActive: true,
+    });
+
+    if (supportUsers.length !== uniqueSupportIds.length) {
       return res.status(404).json({
         success: false,
-        message: "Active support staff not found",
+        message: "One or more active support staff not found",
       });
     }
 
@@ -507,10 +576,13 @@ const assignSupportToGroup = async (req, res, next) => {
         isActive: true,
       },
       {
-        $set: { assignedSupport: supportId },
+        $set: {
+          assignedSupport: uniqueSupportIds,
+        },
       },
       {
         new: true,
+        runValidators: true,
       }
     ).populate("assignedSupport", "name email");
 
@@ -531,6 +603,8 @@ const assignSupportToGroup = async (req, res, next) => {
   }
 };
 
+
+
 module.exports = {
   getMyGroups,
   getMySupportGroups,
@@ -538,4 +612,6 @@ module.exports = {
   sendGroupMessage,
   uploadGroupImage,
   assignSupportToGroup,
+  getAllGroups,
+  getActiveSupportStaff,
 };

@@ -12,11 +12,17 @@ import {
   ClipboardList,
   Layers,
   MessageCircle,
+  ShieldCheck,
 } from "lucide-react";
 
 const adminMenuItems = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard },
   { label: "Staff Management", path: "/admin/staff", icon: Users },
+  {
+  label: "Group Access",
+  path: "/admin/group-access",
+  icon: ShieldCheck,
+},
   { label: "Courses", path: "/admin/courses", icon: BookOpen },
   { label: "Modules", path: "/admin/modules", icon: Layers },
   { label: "Lessons", path: "/admin/lessons", icon: BookOpen },

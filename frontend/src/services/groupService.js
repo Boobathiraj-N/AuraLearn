@@ -65,4 +65,26 @@ export const sendGroupImage = async (groupId, imageFile) => {
   return response.data;
 };
 
+// ADMIN: GET ALL COURSE GROUPS
+export const getAllGroups = async () => {
+  const response = await groupApi.get("/groups/admin/all-groups");
+  return response.data;
+};
+
+// ADMIN: GET ACTIVE SUPPORT STAFF
+export const getActiveSupportStaff = async () => {
+  const response = await groupApi.get("/groups/admin/support-staff");
+  return response.data;
+};
+
+// ADMIN: ASSIGN SUPPORT TO GROUP
+export const assignSupportToGroup = async (groupId, supportIds) => {
+  const response = await groupApi.patch(
+    `/groups/${groupId}/assign-support`,
+    { supportIds }
+  );
+
+  return response.data;
+};
+
 export default groupApi;

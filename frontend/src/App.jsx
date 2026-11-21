@@ -36,6 +36,7 @@ import ChangePassword from "./pages/ChangePassword";
 import GroupChat from "./pages/student/GroupChat";
 import SupportGroups from "./pages/staff/SupportGroups";
 import SupportGroupChat from "./pages/staff/SupportGroupChat";
+import GroupAccessManagement from "./pages/admin/GroupAccessManagement";
 
 import "./App.css";
 
@@ -135,6 +136,7 @@ function App() {
           <Route path="/admin" element={<DashboardLayout />}>
             <Route index element={<AdminDashboard />} />
             <Route path="staff" element={<StaffManagement />} />
+            <Route path="group-access" element={<GroupAccessManagement />} />
             <Route path="courses" element={<CourseManagement />} />
             <Route path="lessons" element={<LessonManagement />} />
             <Route path="modules" element={<ModuleManagement />} />

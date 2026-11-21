@@ -21,11 +21,12 @@ const courseGroupSchema = new mongoose.Schema(
       default: "",
     },
 
-    assignedSupport: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
+    assignedSupport: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
 
     isActive: {
       type: Boolean,

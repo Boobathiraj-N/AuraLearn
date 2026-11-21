@@ -107,16 +107,17 @@ io.on("connection", (socket) => {
 
       // Support authorization
       else if (socket.user.role === "support") {
-        hasAccess =
-          group.assignedSupport?.toString() === socket.user.id;
+        hasAccess = group.assignedSupport?.some(
+          (supportId) => supportId.toString() === socket.user.id
+        );
       }
 
-      if (!hasAccess) {
-        return callback?.({
-          success: false,
-          message: "You don't have access to this group",
-        });
-      }
+      // if (!hasAccess) {
+      //   return callback?.({
+      //     success: false,
+      //     message: "You don't have access to this group",
+      //   });
+      // }
 
       // Join Socket.io room
       socket.join(`group:${groupId}`);
