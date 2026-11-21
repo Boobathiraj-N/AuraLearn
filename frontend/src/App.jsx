@@ -46,7 +46,17 @@ function GlobalSocket() {
     const token = localStorage.getItem("authToken");
 
     if (token) {
-      connectSocket(token);
+      const socket = connectSocket(token);
+
+      const handleNotification = (data) => {
+        console.log("GLOBAL SOCKET NOTIFICATION RECEIVED:", data);
+      };
+
+      socket.on("new-notification", handleNotification);
+
+      return () => {
+        socket.off("new-notification", handleNotification);
+      };
     } else {
       disconnectSocket();
     }

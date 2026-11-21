@@ -9,7 +9,6 @@ import {
 } from "../../services/groupService";
 import {
   connectSocket,
-  disconnectSocket,
   getSocket,
 } from "../../services/socketService";
 import { markGroupNotificationsAsRead } from "../../services/notificationService";
@@ -87,11 +86,10 @@ function GroupChat() {
     handleConnect();
   }
 
-  return () => {
-    socket.off("connect", handleConnect);
-    socket.off("connect_error", handleConnectError);
-    disconnectSocket();
-  };
+return () => {
+  socket.off("connect", handleConnect);
+  socket.off("connect_error", handleConnectError);
+};
   }, [groupId]);
 
   useEffect(() => {

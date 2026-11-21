@@ -12,7 +12,6 @@ import {
 
 import {
   connectSocket,
-  disconnectSocket,
   getSocket,
 } from "../../services/socketService";
 
@@ -103,7 +102,6 @@ function SupportGroupChat() {
     return () => {
       socket.off("connect", handleConnect);
       socket.off("connect_error", handleConnectError);
-      disconnectSocket();
     };
   }, [groupId]);
 

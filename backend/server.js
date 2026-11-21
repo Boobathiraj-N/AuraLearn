@@ -64,16 +64,10 @@ io.on("connection", (socket) => {
     `User connected: ${socket.user.id} (${socket.user.role})`
   );
 
-    io.on("connection", (socket) => {
-    console.log("User connected:", socket.id);
+  // Join personal notification room
+  socket.join(`user:${socket.user.id}`);
 
-    // Join personal notification room
-    socket.join(`user:${socket.user.id}`);
-
-    console.log(`User joined personal room: user:${socket.user.id}`);
-
-    // Existing socket events continue here...
-  });
+  console.log(`User joined personal room: user:${socket.user.id}`);
 
   // Join course group room
   socket.on("join-group", async ({ groupId }, callback) => {

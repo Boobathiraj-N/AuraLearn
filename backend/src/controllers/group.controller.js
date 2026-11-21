@@ -265,19 +265,44 @@ const sendGroupMessage = async (req, res, next) => {
 
         
 
+        // notifications.forEach((notification) => {
+        //   console.log("Emitting notification to:", notification.recipient);
+
+        //   io.to(`user:${notification.recipient}`).emit(
+        //     "new-notification",
+        //     {
+        //       _id: notification._id,
+        //       group: groupId,
+        //       message: message._id,
+        //       sender: req.user.id,
+        //       notificationType: "new_message",
+        //       createdAt: notification.createdAt,
+        //     }
+        //   );
+
+        //   console.log("Notification emitted successfully");
+        // });
         notifications.forEach((notification) => {
-          io.to(`user:${notification.recipient}`).emit(
-            "new-notification",
-            {
-              _id: notification._id,
-              group: groupId,
-              message: message._id,
-              sender: req.user.id,
-              notificationType: "new_message",
-              createdAt: notification.createdAt,
-            }
-          );
-        });
+  const roomName = `user:${notification.recipient}`;
+
+  console.log("Notification room:", roomName);
+
+  console.log(
+    "Room sockets:",
+    io.sockets.adapter.rooms.get(roomName)
+  );
+
+  io.to(roomName).emit("new-notification", {
+    _id: notification._id,
+    group: groupId,
+    message: message._id,
+    sender: req.user.id,
+    notificationType: "new_message",
+    createdAt: notification.createdAt,
+  });
+
+  console.log("Notification emitted successfully");
+});
       }
 
 
@@ -408,6 +433,8 @@ const uploadGroupImage = async (req, res, next) => {
       );
 
       notifications.forEach((notification) => {
+        console.log("Emitting notification to:", notification.recipient);
+
         io.to(`user:${notification.recipient}`).emit(
           "new-notification",
           {
@@ -419,6 +446,8 @@ const uploadGroupImage = async (req, res, next) => {
             createdAt: notification.createdAt,
           }
         );
+        console.log("Notification emitted successfully");
+
       });
     }
 
