@@ -13,3 +13,9 @@ export const verifyPayment = async (paymentData) => {
 
   return response.data;
 };
+
+export const getMyPurchases = async () => {
+  const response = await authAPI.get("/payments/my-purchases");
+
+  return response.data;
+};

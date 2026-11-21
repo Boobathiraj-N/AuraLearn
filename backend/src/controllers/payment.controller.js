@@ -122,6 +122,39 @@ const createPaymentOrder = async (req, res, next) => {
 };
 
 
+
+const getMyPurchases = async (req, res, next) => {
+  try {
+    const purchases = await PaymentHistory.find({
+      student: req.user.id,
+      status: "captured",
+    })
+      .populate("course", "title thumbnail price")
+      .sort({ verifiedAt: -1 });
+
+    const formattedPurchases = purchases.map((payment) => ({
+      _id: payment._id,
+      course: payment.course,
+      purchaseDate: payment.verifiedAt || payment.createdAt,
+      amount: payment.amount / 100,
+      currency: payment.currency,
+      paymentMethod: payment.paymentMethod,
+      paymentId: payment.razorpayPaymentId,
+      orderId: payment.razorpayOrderId,
+      status: payment.status,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      count: formattedPurchases.length,
+      data: formattedPurchases,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 const verifyPayment = async (req, res, next) => {
   try {
     const {
@@ -328,4 +361,5 @@ const verifyPayment = async (req, res, next) => {
 module.exports = {
   createPaymentOrder,
   verifyPayment,
+  getMyPurchases,
 };

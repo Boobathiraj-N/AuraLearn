@@ -7,7 +7,15 @@ const authorizeRole = require("../middleware/role.middleware");
 const {
   createPaymentOrder,
   verifyPayment,
+  getMyPurchases,
 } = require("../controllers/payment.controller");
+
+router.get(
+  "/my-purchases",
+  protect,
+  authorizeRole("student"),
+  getMyPurchases
+);
 
 router.post(
   "/create-order",

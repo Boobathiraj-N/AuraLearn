@@ -37,6 +37,7 @@ import GroupChat from "./pages/student/GroupChat";
 import SupportGroups from "./pages/staff/SupportGroups";
 import SupportGroupChat from "./pages/staff/SupportGroupChat";
 import GroupAccessManagement from "./pages/admin/GroupAccessManagement";
+import MyPurchases from "./pages/student/MyPurchases";
 
 import "./App.css";
 
@@ -122,6 +123,12 @@ function App() {
           <Route
             path="/student/groups/:groupId"
             element={<GroupChat />}
+          />
+
+          {/* My Purchases */}
+          <Route
+            path="/student/my-purchases"
+            element={<MyPurchases />}
           />
         </Route>
 
