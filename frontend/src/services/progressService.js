@@ -17,3 +17,17 @@ export const completeLesson = async (courseId, lessonId) => {
 
   return response.data;
 };
+
+// Save video watch position
+export const saveVideoProgress = async (
+  courseId,
+  lessonId,
+  currentTime
+) => {
+  const response = await authAPI.patch(
+    `/progress/courses/${courseId}/lessons/${lessonId}/video-progress`,
+    { currentTime }
+  );
+
+  return response.data;
+};

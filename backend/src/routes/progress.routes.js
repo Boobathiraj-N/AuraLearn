@@ -8,6 +8,7 @@ const authorizeRole = require("../middleware/role.middleware");
 const {
   getCourseProgress,
   completeLesson,
+  saveVideoProgress,
   getCourseCertificate,
   downloadCourseCertificate,
 } = require("../controllers/progress.controller");
@@ -28,6 +29,14 @@ router.patch(
   protect,
   authorizeRole("student"),
   completeLesson
+);
+
+// Save video watch position
+router.patch(
+  "/courses/:courseId/lessons/:lessonId/video-progress",
+  protect,
+  authorizeRole("student"),
+  saveVideoProgress
 );
 
 // Certificate 

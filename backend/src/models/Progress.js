@@ -22,6 +22,18 @@ const progressSchema = new mongoose.Schema(
       },
     ],
 
+    lastWatchedLesson: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Lesson",
+      default: null,
+    },
+
+    lastWatchedPosition: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
     completedChallenges: [
       {
         type: mongoose.Schema.Types.ObjectId,

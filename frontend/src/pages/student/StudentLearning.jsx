@@ -1,5 +1,10 @@
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getMyGroups } from "../../services/groupService";
 
@@ -7,7 +12,76 @@ import { getEnrolledCourseContent } from "../../services/courseService";
 import {
   getCourseProgress,
   completeLesson,
+  saveVideoProgress,
 } from "../../services/progressService";
+
+const getYouTubeVideoId = (url) => {
+  if (!url) return null;
+
+  try {
+    const parsedUrl = new URL(url);
+    const hostname = parsedUrl.hostname.replace("www.", "");
+
+    let videoId = null;
+
+    if (hostname === "youtu.be") {
+      videoId = parsedUrl.pathname.split("/")[1];
+    } else if (
+      hostname === "youtube.com" ||
+      hostname === "m.youtube.com" ||
+      hostname === "youtube-nocookie.com"
+    ) {
+      if (parsedUrl.pathname === "/watch") {
+        videoId = parsedUrl.searchParams.get("v");
+      } else {
+        const match = parsedUrl.pathname.match(
+          /^\/(embed|shorts|live)\/([^/]+)/
+        );
+
+        videoId = match ? match[2] : null;
+      }
+    }
+
+    if (!videoId || videoId === "VIDEO_ID") {
+      return null;
+    }
+
+    return videoId;
+  } catch {
+    return null;
+  }
+};
+
+let youtubeApiPromise;
+
+const loadYouTubeAPI = () => {
+  if (window.YT?.Player) {
+    return Promise.resolve(window.YT);
+  }
+
+  if (!youtubeApiPromise) {
+    youtubeApiPromise = new Promise((resolve) => {
+      const previousCallback = window.onYouTubeIframeAPIReady;
+
+      window.onYouTubeIframeAPIReady = () => {
+        previousCallback?.();
+        resolve(window.YT);
+      };
+
+      if (
+        !document.querySelector(
+          'script[src="https://www.youtube.com/iframe_api"]'
+        )
+      ) {
+        const script = document.createElement("script");
+        script.src = "https://www.youtube.com/iframe_api";
+        document.head.appendChild(script);
+      }
+    });
+  }
+
+  return youtubeApiPromise;
+};
 
 const StudentLearning = () => {
   const { courseId } = useParams();
@@ -22,7 +96,17 @@ const [courseGroup, setCourseGroup] = useState(null);
   const [selectedLesson, setSelectedLesson] = useState(null);
   const [expandedModules, setExpandedModules] = useState([]);
   const [completing, setCompleting] = useState(false);
-const [completionError, setCompletionError] = useState("");
+  const [completionError, setCompletionError] = useState("");
+    // YouTube player references
+  const playerRef = useRef(null);
+  const playerContainerRef = useRef(null);
+  const saveIntervalRef = useRef(null);
+  const lastSavedTimeRef = useRef(0);
+
+  // Video resume position
+  const [resumePosition, setResumePosition] = useState(0);
+  const [youtubeReady, setYoutubeReady] = useState(false);
+
 
   useEffect(() => {
     const fetchLearningData = async () => {
@@ -42,11 +126,38 @@ const [completionError, setCompletionError] = useState("");
         const firstModule = contentResponse.modules?.[0];
         const firstLesson = firstModule?.lessons?.[0];
 
-        setSelectedLesson(firstLesson || null);
+        // Restore last watched lesson
+        const savedLessonId =
+          progressResponse.progress?.lastWatchedLesson?._id ||
+          progressResponse.progress?.lastWatchedLesson;
 
-        if (firstModule) {
-          setExpandedModules([firstModule._id]);
+        const savedLesson = contentResponse.modules
+          ?.flatMap((module) => module.lessons || [])
+          .find((lesson) => lesson._id === savedLessonId);
+
+        const lessonToOpen = savedLesson || firstLesson;
+
+        setSelectedLesson(lessonToOpen || null);
+
+        // Restore saved video position
+        setResumePosition(
+          savedLesson
+            ? progressResponse.progress?.lastWatchedPosition || 0
+            : 0
+        );
+
+        if (lessonToOpen) {
+          const matchingModule = contentResponse.modules.find((module) =>
+            module.lessons?.some(
+              (lesson) => lesson._id === lessonToOpen._id
+            )
+          );
+
+          if (matchingModule) {
+            setExpandedModules([matchingModule._id]);
+          }
         }
+
       } catch (error) {
         setError(
           error.response?.data?.message ||
@@ -77,6 +188,149 @@ const [completionError, setCompletionError] = useState("");
 
   fetchCourseGroup();
   }, [courseId]);
+
+  useEffect(() => {
+  const videoId = getYouTubeVideoId(
+    selectedLesson?.videoUrl
+  );
+
+  if (!videoId) {
+    setYoutubeReady(false);
+    return;
+  }
+
+  let isCancelled = false;
+
+  const initializePlayer = async () => {
+    try {
+
+      const videoId = getYouTubeVideoId(selectedLesson?.videoUrl);
+
+      if (!videoId || videoId === "VIDEO_ID") {
+        setYoutubeReady(false);
+        return;
+      }
+      const YT = await loadYouTubeAPI();
+
+      if (isCancelled || !playerContainerRef.current) {
+        return;
+      }
+
+      // Destroy previous player
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+
+      playerRef.current = new YT.Player(
+        playerContainerRef.current,
+        {
+          videoId,
+          width: "100%",
+          height: "100%",
+          playerVars: {
+            autoplay: 0,
+            controls: 1,
+            rel: 0,
+            enablejsapi: 1,
+            origin: window.location.origin,
+          },
+          events: {
+            onReady: (event) => {
+              console.log("YouTube Player Ready");
+
+              if (resumePosition > 0) {
+                event.target.seekTo(resumePosition, true);
+              }
+
+              setYoutubeReady(true);
+            },
+
+            onError: (event) => {
+              console.error("YouTube Player Error:", event.data);
+            },
+          },
+        }
+      );
+    } catch (error) {
+      console.error("YouTube player initialization failed:", error);
+    }
+  };
+
+  initializePlayer();
+
+  return () => {
+    isCancelled = true;
+    setYoutubeReady(false);
+
+    if (playerRef.current) {
+      playerRef.current.destroy();
+      playerRef.current = null;
+    }
+  };
+  }, [selectedLesson?._id, resumePosition]);
+
+  useEffect(() => {
+  if (!youtubeReady || !selectedLesson) return;
+
+  lastSavedTimeRef.current = 0;
+
+  const saveCurrentPosition = async () => {
+    const player = playerRef.current;
+
+    if (!player || typeof player.getCurrentTime !== "function") {
+      return;
+    }
+
+    const currentTime = Math.floor(player.getCurrentTime());
+
+    if (currentTime <= 0) return;
+
+    // Save only when position changes by at least 5 seconds
+    if (Math.abs(currentTime - lastSavedTimeRef.current) < 5) {
+      return;
+    }
+
+    try {
+      await saveVideoProgress(
+        courseId,
+        selectedLesson._id,
+        currentTime
+      );
+
+      lastSavedTimeRef.current = currentTime;
+    } catch (error) {
+      console.error("Failed to save video progress:", error);
+    }
+  };
+
+  // Automatically save every 5 seconds
+  saveIntervalRef.current = setInterval(
+    saveCurrentPosition,
+    5000
+  );
+
+  return () => {
+    clearInterval(saveIntervalRef.current);
+
+    // Save final position when changing lesson or leaving
+    const player = playerRef.current;
+
+    if (player && typeof player.getCurrentTime === "function") {
+      const currentTime = Math.floor(player.getCurrentTime());
+
+      if (currentTime > 0) {
+        saveVideoProgress(
+          courseId,
+          selectedLesson._id,
+          currentTime
+        ).catch((error) => {
+          console.error("Final video progress save failed:", error);
+        });
+      }
+    }
+  };
+  }, [youtubeReady, selectedLesson?._id, courseId]);
 
   const toggleModule = (moduleId) => {
     setExpandedModules((prev) =>
@@ -199,6 +453,13 @@ const [completionError, setCompletionError] = useState("");
     );
   }
 
+    console.log("Selected lesson:", selectedLesson);
+  console.log("Video URL:", selectedLesson?.videoUrl);
+  console.log(
+    "YouTube ID:",
+    getYouTubeVideoId(selectedLesson?.videoUrl)
+  );
+
   return (
     <div className="min-h-screen bg-[#090d18] text-white">
       {/* Header */}
@@ -259,23 +520,21 @@ const [completionError, setCompletionError] = useState("");
 
               <div className="bg-black">
                 {selectedLesson?.videoUrl &&
-                !selectedLesson.videoUrl.includes("VIDEO_ID") ? (
-                  <iframe
-                    key={selectedLesson._id}
+                getYouTubeVideoId(selectedLesson.videoUrl) ? (
+                  <div
+                    ref={playerContainerRef}
                     className="aspect-video w-full"
-                    src={selectedLesson.videoUrl}
-                    title={selectedLesson.title}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
                   />
                 ) : (
                   <div className="flex aspect-video flex-col items-center justify-center bg-[#080c16] px-4 text-center">
                     <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-indigo-500/10 text-3xl">
                       ▶
                     </div>
+
                     <p className="font-medium text-gray-300">
                       Video not available
                     </p>
+
                     <p className="mt-2 text-sm text-gray-500">
                       The instructor has not added a video for this lesson yet.
                     </p>

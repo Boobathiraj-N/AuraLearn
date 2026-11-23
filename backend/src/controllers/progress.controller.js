@@ -103,6 +103,103 @@ const getCourseCertificate = async (req, res, next) => {
 };
 
 
+const saveVideoProgress = async (req, res, next) => {
+  try {
+    const { courseId, lessonId } = req.params;
+    const { currentTime } = req.body;
+    const studentId = req.user.id;
+
+    if (
+      !mongoose.Types.ObjectId.isValid(courseId) ||
+      !mongoose.Types.ObjectId.isValid(lessonId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid course ID or lesson ID",
+      });
+    }
+
+    if (
+      typeof currentTime !== "number" ||
+      !Number.isFinite(currentTime) ||
+      currentTime < 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid video position is required",
+      });
+    }
+
+    const enrollment = await Enrollment.findOne({
+      student: studentId,
+      course: courseId,
+      status: "active",
+    });
+
+    if (!enrollment) {
+      return res.status(403).json({
+        success: false,
+        message: "Active course enrollment not found",
+      });
+    }
+
+    const lesson = await Lesson.findById(lessonId);
+
+    if (!lesson) {
+      return res.status(404).json({
+        success: false,
+        message: "Lesson not found",
+      });
+    }
+
+    const lessonModule = await Module.findOne({
+      _id: lesson.module,
+      course: courseId,
+    });
+
+    if (!lessonModule) {
+      return res.status(400).json({
+        success: false,
+        message: "Lesson does not belong to this course",
+      });
+    }
+
+    const progress = await Progress.findOneAndUpdate(
+      {
+        student: studentId,
+        course: courseId,
+      },
+      {
+        $set: {
+          lastWatchedLesson: lessonId,
+          lastWatchedPosition: Math.floor(currentTime),
+          lastAccessedAt: new Date(),
+        },
+      },
+      { new: true }
+    );
+
+    if (!progress) {
+      return res.status(404).json({
+        success: false,
+        message: "Course progress not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Video progress saved",
+      data: {
+        lastWatchedLesson: progress.lastWatchedLesson,
+        lastWatchedPosition: progress.lastWatchedPosition,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 // MARK LESSON AS COMPLETED
 
 const completeLesson = async (req, res, next) => {
@@ -403,6 +500,7 @@ const downloadCourseCertificate = async (req, res, next) => {
 module.exports = {
   getCourseProgress,
   completeLesson,
+  saveVideoProgress,
   getCourseCertificate,
   downloadCourseCertificate,
 };
