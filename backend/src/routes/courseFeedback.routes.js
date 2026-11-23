@@ -7,7 +7,16 @@ const authorizeRole = require("../middleware/role.middleware");
 const {
   submitCourseFeedback,
   getCourseFeedback,
+  getPendingCourseFeedback,
 } = require("../controllers/courseFeedback.controller");
+
+// Get pending course feedback
+router.get(
+  "/pending",
+  protect,
+  authorizeRole("student"),
+  getPendingCourseFeedback
+);
 
 // Submit course feedback
 router.post(

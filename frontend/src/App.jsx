@@ -157,7 +157,7 @@ function App() {
         {/* Support Protected Routes */}
         <Route element={<ProtectedRoute allowedRoles={["support"]} />}>
           <Route path="/support" element={<DashboardLayout />}>
-            <Route index element={<StaffDashboard />} />
+            <Route index element={<Navigate to="/support/leads" replace />} />
             <Route path="leads" element={<LeadManagement />} />
             <Route path="leads/:leadId" element={<LeadDetails />} />
             <Route path="groups" element={<SupportGroups />} />
@@ -168,7 +168,7 @@ function App() {
         {/* Sales Protected Routes */}
         <Route element={<ProtectedRoute allowedRoles={["sales"]} />}>
           <Route path="/sales" element={<DashboardLayout />}>
-            <Route index element={<StaffDashboard />} />
+            <Route index element={<Navigate to="/sales/leads" replace />} />
             <Route path="leads" element={<LeadManagement />} />
             <Route path="leads/:leadId" element={<LeadDetails />} />
           </Route>

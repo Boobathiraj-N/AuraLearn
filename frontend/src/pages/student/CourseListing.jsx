@@ -13,6 +13,11 @@ import {
   markNotificationAsRead,
 } from "../../services/notificationService";
 
+import {
+  getPendingCourseFeedback,
+  submitCourseFeedback,
+} from "../../services/courseFeedbackService";
+
 
 const categories = [
   "All",
@@ -40,6 +45,14 @@ const CourseListing = () => {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [notificationLoading, setNotificationLoading] = useState(false);
+  const [pendingFeedbackCourses, setPendingFeedbackCourses] = useState([]);
+  const [activeFeedbackCourse, setActiveFeedbackCourse] = useState(null);
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackReview, setFeedbackReview] = useState("");
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackDismissed, setFeedbackDismissed] = useState(
+    () => sessionStorage.getItem("feedbackDismissed") === "true"
+  );
 
   const user = JSON.parse(localStorage.getItem("authUser") || "{}");
   const userName = user.name || "Student";
@@ -109,6 +122,24 @@ useEffect(() => {
   };
 }, []);
 
+useEffect(() => {
+  const fetchPendingFeedback = async () => {
+    try {
+      const result = await getPendingCourseFeedback();
+
+      setPendingFeedbackCourses(result.courses || []);
+
+      if (result.courses?.length > 0) {
+        setActiveFeedbackCourse(result.courses[0]);
+      }
+    } catch (error) {
+      console.error("Failed to load pending feedback:", error);
+    }
+  };
+
+  fetchPendingFeedback();
+}, []);
+
 
   const filteredCourses = useMemo(() => {
     return courses.filter((course) => {
@@ -138,6 +169,37 @@ useEffect(() => {
     });
   }, [courses, search, activeCategory]);
 
+
+const handleSubmitFeedback = async () => {
+  if (!feedbackRating || !activeFeedbackCourse) return;
+
+  try {
+    setFeedbackSubmitting(true);
+
+    await submitCourseFeedback(activeFeedbackCourse._id, {
+      rating: feedbackRating,
+      review: feedbackReview,
+    });
+
+    const remainingCourses = pendingFeedbackCourses.filter(
+      (course) => course._id !== activeFeedbackCourse._id
+    );
+
+    setPendingFeedbackCourses(remainingCourses);
+    setActiveFeedbackCourse(remainingCourses[0] || null);
+
+    setFeedbackRating(0);
+    setFeedbackReview("");
+
+    setMessage("Thank you for your feedback! ⭐");
+    } catch (error) {
+      setMessage(
+        error.response?.data?.message || "Failed to submit feedback."
+      );
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  };
 
   const handleEnroll = async (event, course) => {
     event.stopPropagation();
@@ -717,6 +779,110 @@ useEffect(() => {
           </section>
         </main>
       </div>
+      
+{activeFeedbackCourse && !feedbackDismissed && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020617]/80 p-4 backdrop-blur-md">
+    <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-[#111827] via-[#15152f] to-[#0f172a] p-5 shadow-2xl shadow-indigo-950/50">
+
+      {/* Decorative gradient */}
+      <div className="absolute -right-20 -top-20 h-48 w-48 rounded-full bg-purple-600/20 blur-3xl" />
+
+      <div className="relative">
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <span className="mb-3 inline-block rounded-full border border-indigo-400/30 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-300">
+              COURSE COMPLETED
+            </span>
+
+            <h2 className="text-xl font-bold text-white">
+              Amazing Work! 🎉
+            </h2>
+
+            <p className="mt-2 text-sm text-gray-400">
+              You've reached the finish line.
+            </p>
+          </div>
+
+          <button
+            onClick={() => {
+              sessionStorage.setItem("feedbackDismissed", "true");
+              setFeedbackDismissed(true);
+            }}
+            className="rounded-lg p-2 text-gray-400 transition hover:bg-white/10 hover:text-white"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="mb-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
+            Completed Course
+          </p>
+          <p className="mt-2 font-semibold text-white">
+            {activeFeedbackCourse.title}
+          </p>
+        </div>
+
+        <div className="mb-5 text-center">
+          <p className="mb-4 text-sm font-medium text-gray-300">
+            How was your learning experience?
+          </p>
+
+          <div className="flex justify-center gap-2">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                onClick={() => setFeedbackRating(star)}
+                className={`text-3xl transition duration-200 hover:scale-125 ${
+                  feedbackRating >= star
+                    ? "text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]"
+                    : "text-gray-600 hover:text-yellow-300"
+                }`}
+              >
+                ★
+              </button>
+            ))}
+          </div>
+
+          <p className="mt-2 text-xs text-gray-500">
+            {feedbackRating
+              ? `${feedbackRating} out of 5 stars`
+              : "Select your rating"}
+          </p>
+        </div>
+
+        <textarea
+          value={feedbackReview}
+          onChange={(e) => setFeedbackReview(e.target.value)}
+          placeholder="Tell us what you liked about this course..."
+          maxLength={1000}
+          rows={3}
+          className="w-full resize-none rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-white outline-none placeholder:text-gray-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+        />
+
+        <button
+          onClick={handleSubmitFeedback}
+          disabled={!feedbackRating || feedbackSubmitting}
+          className="mt-4 w-full rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 py-3.5 font-semibold text-white shadow-lg shadow-indigo-900/30 transition hover:from-indigo-500 hover:to-purple-500 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {feedbackSubmitting ? "Submitting..." : "Submit Feedback →"}
+        </button>
+
+        <button
+          onClick={() => {
+            sessionStorage.setItem("feedbackDismissed", "true");
+            setFeedbackDismissed(true);
+          }}
+          className="mt-3 w-full py-2 text-sm text-gray-500 transition hover:text-gray-300"
+        >
+          Maybe later
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
     </div>
   );
 };

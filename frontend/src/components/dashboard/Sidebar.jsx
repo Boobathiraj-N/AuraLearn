@@ -31,11 +31,6 @@ const adminMenuItems = [
 
 const staffMenuItems = (role) => [
   {
-    label: "Dashboard",
-    path: `/${role}`,
-    icon: LayoutDashboard,
-  },
-  {
     label: "Leads",
     path: `/${role}/leads`,
     icon: ClipboardList,

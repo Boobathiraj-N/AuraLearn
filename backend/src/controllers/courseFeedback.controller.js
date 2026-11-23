@@ -2,6 +2,8 @@ const mongoose = require("mongoose");
 const CourseFeedback = require("../models/CourseFeedback");
 const Course = require("../models/Course");
 const Enrollment = require("../models/Enrollment");
+const Progress = require("../models/Progress");
+
 
 // SUBMIT COURSE FEEDBACK
 const submitCourseFeedback = async (req, res, next) => {
@@ -98,6 +100,44 @@ const submitCourseFeedback = async (req, res, next) => {
   }
 };
 
+// GET PENDING COURSE FEEDBACK
+const getPendingCourseFeedback = async (req, res, next) => {
+  try {
+    const studentId = req.user.id;
+
+    // Get completed courses
+    const completedCourses = await Progress.find({
+      student: studentId,
+      progressPercentage: 100,
+    }).populate("course", "title thumbnail");
+
+    // Get already submitted feedback
+    const submittedFeedback = await CourseFeedback.find({
+      student: studentId,
+    }).select("course");
+
+    const submittedCourseIds = new Set(
+      submittedFeedback.map((item) => item.course.toString())
+    );
+
+    // Filter courses without feedback
+    const pendingCourses = completedCourses
+      .filter(
+        (item) =>
+          item.course &&
+          !submittedCourseIds.has(item.course._id.toString())
+      )
+      .map((item) => item.course);
+
+    res.status(200).json({
+      success: true,
+      courses: pendingCourses,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // GET COURSE FEEDBACK
 const getCourseFeedback = async (req, res, next) => {
   try {
@@ -151,4 +191,5 @@ const getCourseFeedback = async (req, res, next) => {
 module.exports = {
   submitCourseFeedback,
   getCourseFeedback,
+  getPendingCourseFeedback,
 };
